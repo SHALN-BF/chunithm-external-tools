@@ -790,7 +790,7 @@
                     ctx.fillText(value, x + blockWidth - 15, y_pos);
                     ctx.textAlign = 'left';
                 };
-                drawDataRow('CONST', song.const ? song.const.toFixed(1) : 'N/A', current_y);
+                drawDataRow('CONST', song.const ? song.const.toFixed(2) : 'N/A', current_y);
                 current_y += 30;
                 drawDataRow('プレイ回数', song.playCount || 'N/A', current_y);
                 current_y += 32;
@@ -986,7 +986,7 @@
             const progress = 20 + (i / allSongs.length) * 80;
 
             if (i > 0 && delay > 0) {
-                updateMessage(`待機中... (${delay.toFixed(1)}秒) - (${i}/${allSongs.length})`, progress);
+                updateMessage(`待機中... (${delay.toFixed(2)}秒) - (${i}/${allSongs.length})`, progress);
                 await sleep(delay * 1000);
             }
 
