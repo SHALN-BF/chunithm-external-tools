@@ -1,4 +1,4 @@
-(async function() {
+(async function () {
     'use strict';
     //const CURRENT_VERSION = "X-VERSE";
 
@@ -824,8 +824,8 @@
         const secondLineY = canvas.height - PADDING + 10;
         const firstLineY = secondLineY - lineHeight;
 
-        ctx.fillText('非公式ジェネレーターによって生成されました', footerX, firstLineY);
-        ctx.fillText('https://chunithm.fun', footerX, secondLineY);
+        ctx.fillText('CHUNITHM-EXTERNAL-TOOLS', footerX, firstLineY);
+        ctx.fillText('Dev.: SHALN-BF (Fuyant, Aut.)', footerX, secondLineY);
 
         // --- 結果表示 ---
         updateMessage("画像を生成中...");
