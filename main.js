@@ -172,14 +172,14 @@
             const minusButton = createControlButton('-');
             minusButton.onclick = () => {
                 if (scrapeDelay > 0) {
-                    scrapeDelay = Math.max(0, scrapeDelay - 0.5);
+                    scrapeDelay = Math.max(0, scrapeDelay - 0.25);
                     delayValueSpan.textContent = scrapeDelay.toFixed(1);
                 }
             };
             const plusButton = createControlButton('+');
             plusButton.onclick = () => {
                 if (scrapeDelay < 3) {
-                    scrapeDelay = Math.min(3, scrapeDelay + 0.5);
+                    scrapeDelay = Math.min(3, scrapeDelay + 0.25);
                     delayValueSpan.textContent = scrapeDelay.toFixed(1);
                 }
             };
@@ -966,6 +966,7 @@
 
         updateMessage("譜面定数データをダウンロード中...", 10);
         const constData = await fetch(CONST_DATA_URL).then(res => res.json());
+        console.log("定数データを取得:", constData);
         if (isAborted) return;
 
         let detailedSongs = [];
