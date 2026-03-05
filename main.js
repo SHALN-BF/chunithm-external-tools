@@ -2,8 +2,8 @@
     'use strict';
     //const CURRENT_VERSION = "X-VERSE";
 
-    const GITHUB_USER = "taka-4602";
-    const GITHUB_REPO = "chunithm-best-generator";
+    const GITHUB_USER = "SHALN-BF";
+    const GITHUB_REPO = "chunithm-external-tools";
     const CONST_DATA_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/chunithm.json`;
 
     const BASE_URL = "https://new.chunithm-net.com/chuni-mobile/html/mobile/";
