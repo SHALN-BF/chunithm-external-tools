@@ -147,7 +147,7 @@
             const delayControls = document.createElement('div');
             delayControls.style.cssText = 'display: flex; justify-content: center; align-items: center;';
             const delayValueSpan = document.createElement('span');
-            delayValueSpan.textContent = scrapeDelay.toFixed(1);
+            delayValueSpan.textContent = scrapeDelay.toFixed(2);
             delayValueSpan.style.cssText = 'font-size: 24px; font-weight: bold; color: white; width: 80px;';
             const createControlButton = (text) => {
                 const button = document.createElement('button');
@@ -173,14 +173,14 @@
             minusButton.onclick = () => {
                 if (scrapeDelay > 0) {
                     scrapeDelay = Math.max(0, scrapeDelay - 0.25);
-                    delayValueSpan.textContent = scrapeDelay.toFixed(1);
+                    delayValueSpan.textContent = scrapeDelay.toFixed(2);
                 }
             };
             const plusButton = createControlButton('+');
             plusButton.onclick = () => {
                 if (scrapeDelay < 3) {
                     scrapeDelay = Math.min(3, scrapeDelay + 0.25);
-                    delayValueSpan.textContent = scrapeDelay.toFixed(1);
+                    delayValueSpan.textContent = scrapeDelay.toFixed(2);
                 }
             };
             delayControls.appendChild(minusButton);
