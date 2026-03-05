@@ -360,6 +360,16 @@
         return { artist, jacketUrl, playCount };
     };
 
+    const normalizeTitle = (title = '') => {
+        return title
+            .replace(/\u3000/g, ' ')
+            .replace(/[\s\u200B-\u200D\uFEFF]+/g, ' ')
+            .replace(/[’]/g, "'")
+            .replace(/[“”]/g, '"')
+            .trim()
+            .toLowerCase();
+    };
+
     const calculateRating = (score, constant) => {
         score = Number(score);
         constant = Number(constant);
@@ -967,6 +977,13 @@
         updateMessage("譜面定数データをダウンロード中...", 10);
         const constData = await fetch(CONST_DATA_URL).then(res => res.json());
         console.log("定数データを取得:", constData);
+        const constMap = new Map();
+        constData.forEach(entry => {
+            const key = `${normalizeTitle(entry.title)}|${entry.diff}`;
+            if (!constMap.has(key)) {
+                constMap.set(key, entry.const);
+            }
+        });
         if (isAborted) return;
 
         let detailedSongs = [];
@@ -997,7 +1014,8 @@
 
             const difficultyMapToJson = { 'MASTER': 'MAS', 'EXPERT': 'EXP', 'ULTIMA': 'ULT', 'ADVANCED': 'ADV', 'BASIC': 'BAS' };
             const diffAbbreviation = difficultyMapToJson[song.difficulty];
-            const matchedConst = constData.find(m => m.title === song.title && m.diff === diffAbbreviation)?.const;
+            const songKey = `${normalizeTitle(song.title)}|${diffAbbreviation}`;
+            const matchedConst = constMap.get(songKey);
             const rating = calculateRating(song.score_int, matchedConst);
 
             detailedSongs.push({ ...song, ...details, 'const': matchedConst || 0.0, rating });
