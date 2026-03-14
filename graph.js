@@ -479,8 +479,10 @@
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
 
-        const width = 1200;
-        const height = 150 + (bestList.length * 45) + 100 + (recentList.length * 45) + 100;
+        const isVertical = mode === 'vertical';
+        const rowHeight = isVertical ? 50 : 45;
+        const width = isVertical ? 920 : 1400;
+        const height = (isVertical ? 200 : 170) + (bestList.length * rowHeight) + 100 + (recentList.length * rowHeight) + 110;
         canvas.width = width;
         canvas.height = height;
 
@@ -510,12 +512,15 @@
 
         // Draw Title
         ctx.fillStyle = "#ffffff";
-        ctx.font = 'bold 40px "Noto Sans JP", sans-serif';
+        ctx.font = 'bold 38px "Noto Sans JP", sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(`CHUNITHM BEST/RECENT GRAPH - ${playerData.name} (Rating: ${playerData.rating})`, 50, 50);
+        ctx.fillText('CHUNITHM BEST/RECENT GRAPH', 50, 34);
+        ctx.font = 'bold 30px "Noto Sans JP", sans-serif';
+        ctx.fillText(`${playerData.name}`, 50, 82);
+        ctx.fillText(`Rating: ${playerData.rating}`, 50, 122);
 
-        const marginLeft = 350;
+        const marginLeft = isVertical ? 280 : 350;
         const marginRight = 50;
         const graphWidth = width - marginLeft - marginRight;
 
@@ -543,7 +548,7 @@
         }
 
         // Process lists
-        let currentY = 180;
+        let currentY = isVertical ? 220 : 200;
 
         const drawSection = (title, list) => {
             ctx.fillStyle = "#ffffff";
@@ -588,7 +593,7 @@
 
                 const colorSet = diffColors[diffAbbr] || { light: 'rgba(100,100,100,0.5)', dark: 'rgba(200,200,200,1)' };
 
-                const barHeight = 26;
+                const barHeight = isVertical ? 30 : 26;
                 const barY = currentY + 15 - barHeight / 2;
 
                 // SSS+ (Light)
@@ -605,7 +610,7 @@
                 ctx.textAlign = 'left';
                 ctx.fillText(`${song.rating.toFixed(2)} / ${sssPlus.toFixed(2)}`, Math.max(xRating, xBase) + 8, currentY + 15);
 
-                currentY += 45;
+                currentY += rowHeight;
             }
         };
 
@@ -634,7 +639,7 @@
 
         const resultImage = document.createElement('img');
         resultImage.src = dataUrl;
-        resultImage.style.cssText = 'width: 100%; max-width: 800px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: block; margin: 0 auto;';
+        resultImage.style.cssText = `width: 100%; max-width: ${isVertical ? 760 : 1280}px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: block; margin: 0 auto;`;
 
         const currentOverlay = document.querySelector('div[style*="top: 0px;"]');
         if (currentOverlay) {
@@ -645,7 +650,7 @@
             currentOverlay.style.paddingBottom = '50px';
 
             const resultContainer = document.createElement('div');
-            resultContainer.style.cssText = 'width: 90%; max-width: 900px; background: #2d2d2d; color: #fff; padding: 20px; border-radius: 15px; text-align: center; position: relative; margin: 0 auto;';
+            resultContainer.style.cssText = `width: 95%; max-width: ${isVertical ? 860 : 1360}px; background: #2d2d2d; color: #fff; padding: 20px; border-radius: 15px; text-align: center; position: relative; margin: 0 auto;`;
 
             const title = document.createElement('h2');
             title.innerText = 'グラフ生成完了！';
