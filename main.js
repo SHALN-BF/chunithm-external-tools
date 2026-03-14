@@ -4,7 +4,7 @@
 
     const GITHUB_USER = "SHALN-BF";
     const GITHUB_REPO = "chunithm-external-tools";
-    const CONST_DATA_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/chunithm.json`;
+    const CONST_DATA_URL = "https://reiwa.f5.si/chunithm_record.json";
 
     const BASE_URL = "https://new.chunithm-net.com/chuni-mobile/html/mobile/";
     const URL_PLAYER_DATA = BASE_URL + "home/playerData/";
