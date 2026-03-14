@@ -481,7 +481,12 @@
 
         const isVertical = mode === 'vertical';
         const rowHeight = isVertical ? 50 : 45;
-        const width = isVertical ? 920 : 1400;
+        const baseTitleAreaWidth = isVertical ? 280 : 350;
+        const baseGraphAreaWidth = isVertical ? 590 : 1000;
+        const marginLeft = Math.round(baseTitleAreaWidth * 1.2);
+        const graphWidth = Math.round(baseGraphAreaWidth * 1.2);
+        const marginRight = 50;
+        const width = marginLeft + graphWidth + marginRight;
         const height = (isVertical ? 200 : 170) + (bestList.length * rowHeight) + 100 + (recentList.length * rowHeight) + 110;
         canvas.width = width;
         canvas.height = height;
@@ -521,6 +526,24 @@
             ratingRange = maxRating - minRating;
         }
 
+        const calcRatingStats = (ratings) => {
+            const values = ratings.filter(v => Number.isFinite(v));
+            if (values.length === 0) {
+                return { avg: 0, std: 0 };
+            }
+            const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+            const variance = values.reduce((sum, v) => sum + ((v - avg) ** 2), 0) / values.length;
+            return { avg, std: Math.sqrt(variance) };
+        };
+
+        const bestRatings = bestList.map(song => Number(song.rating));
+        const recentRatings = recentList.map(song => Number(song.rating));
+        const allRatings = [...bestRatings, ...recentRatings];
+
+        const bestStats = calcRatingStats(bestRatings);
+        const recentStats = calcRatingStats(recentRatings);
+        const allStats = calcRatingStats(allRatings);
+
         // Draw Title
         ctx.fillStyle = "#ffffff";
         ctx.font = 'bold 38px "Noto Sans JP", sans-serif';
@@ -531,9 +554,29 @@
         ctx.fillText(`${playerData.name}`, 50, 82);
         ctx.fillText(`Rating: ${playerData.rating}`, 50, 122);
 
-        const marginLeft = isVertical ? 280 : 350;
-        const marginRight = 50;
-        const graphWidth = width - marginLeft - marginRight;
+        const statsBoxWidth = isVertical ? 430 : 520;
+        const statsX = width - statsBoxWidth - 26;
+        const statsY = 28;
+        const statsLineHeight = 28;
+        const statsBoxHeight = 152;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+        ctx.fillRect(statsX, statsY, statsBoxWidth, statsBoxHeight);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(statsX, statsY, statsBoxWidth, statsBoxHeight);
+
+        ctx.fillStyle = '#D8E9FF';
+        ctx.font = 'bold 22px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText('統計', statsX + 14, statsY + 10);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '18px "Noto Sans JP", sans-serif';
+        ctx.fillText(`BEST平均RATING: ${bestStats.avg.toFixed(4)}  /  標準偏差: ${bestStats.std.toFixed(4)}`, statsX + 14, statsY + 42);
+        ctx.fillText(`新曲平均RATING: ${recentStats.avg.toFixed(4)}  /  標準偏差: ${recentStats.std.toFixed(4)}`, statsX + 14, statsY + 42 + statsLineHeight);
+        ctx.fillText(`全体標準偏差: ${allStats.std.toFixed(4)}`, statsX + 14, statsY + 42 + (statsLineHeight * 2));
 
         const plotX = (val) => {
             let normalized = (val - minRating) / (maxRating - minRating);
@@ -592,7 +635,8 @@
                 ctx.textBaseline = 'middle';
 
                 const labelMaxWidth = marginLeft - 30;
-                const displayTitle = truncateTextToWidth(`${i + 1}. ${song.title}`, labelMaxWidth);
+                const labelText = `${song.rating.toFixed(2)} | ${i + 1}. ${song.title}`;
+                const displayTitle = truncateTextToWidth(labelText, labelMaxWidth);
                 ctx.fillText(displayTitle, 20, currentY + 15);
 
                 // X coordinates
@@ -642,6 +686,21 @@
                 ctx.fillStyle = colorSet.dark;
                 ctx.fillRect(xBase, barY, xRating - xBase, barHeight);
 
+                // Highlight current rating and SSS+ rating lines (top-most, thicker)
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+                ctx.lineWidth = 3.2;
+                ctx.beginPath();
+                ctx.moveTo(xRating, barY - 5);
+                ctx.lineTo(xRating, barY + barHeight + 5);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255, 214, 10, 0.95)';
+                ctx.lineWidth = 3.2;
+                ctx.beginPath();
+                ctx.moveTo(xSSSPlus, barY - 5);
+                ctx.lineTo(xSSSPlus, barY + barHeight + 5);
+                ctx.stroke();
+
                 // Value text
                 ctx.fillStyle = "#ffffff";
                 ctx.font = '16px Arial';
@@ -688,7 +747,7 @@
             currentOverlay.style.paddingBottom = '50px';
 
             const resultContainer = document.createElement('div');
-            resultContainer.style.cssText = `width: 95%; max-width: ${isVertical ? 860 : 1360}px; background: #2d2d2d; color: #fff; padding: 20px; border-radius: 15px; text-align: center; position: relative; margin: 0 auto;`;
+            resultContainer.style.cssText = `width: 95%; max-width: ${width + 120}px; background: #2d2d2d; color: #fff; padding: 20px; border-radius: 15px; text-align: center; position: relative; margin: 0 auto;`;
 
             const title = document.createElement('h2');
             title.innerText = 'グラフ生成完了！';
