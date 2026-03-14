@@ -654,10 +654,12 @@
                 ctx.fillStyle = colorSet.dark;
                 ctx.fillRect(xBase, barY, xRating - xBase, barHeight);
 
-                // Rainbow stripe only for songs that already reached theoretical SSS+
+                const stripeHeight = barHeight * (3 / 7);
+                const stripeY = barY + ((barHeight - stripeHeight) / 2);
+                const stripeWidth = Math.max(0, xSSSPlus - xBase);
+
+                // Center stripe: rainbow only for achieved SSS+, otherwise difficulty color.
                 if (isAtTheoretical) {
-                    const rainbowHeight = barHeight * (3 / 7);
-                    const rainbowY = barY + ((barHeight - rainbowHeight) / 2);
                     const rainbowGradient = ctx.createLinearGradient(xBase, 0, xSSSPlus, 0);
                     rainbowGradient.addColorStop(0.00, 'rgba(255, 64, 64, 0.95)');
                     rainbowGradient.addColorStop(0.17, 'rgba(255, 160, 64, 0.95)');
@@ -667,8 +669,10 @@
                     rainbowGradient.addColorStop(0.85, 'rgba(120, 120, 255, 0.95)');
                     rainbowGradient.addColorStop(1.00, 'rgba(190, 90, 255, 0.95)');
                     ctx.fillStyle = rainbowGradient;
-                    ctx.fillRect(xBase, rainbowY, Math.max(0, xSSSPlus - xBase), rainbowHeight);
+                } else {
+                    ctx.fillStyle = colorSet.dark;
                 }
+                ctx.fillRect(xBase, stripeY, stripeWidth, stripeHeight);
 
                 // Highlight constant anchors (top-most, thicker)
                 ctx.strokeStyle = 'rgba(120, 200, 255, 0.95)';
@@ -724,8 +728,6 @@
                 const currentLabelText = `${song.rating.toFixed(2)}`;
                 const maxLabelText = `${sssPlus.toFixed(2)}`;
                 const baseLabelY = currentY + 15;
-                let currentLabelY = baseLabelY;
-                let maxLabelY = baseLabelY;
 
                 const currentLabelW = ctx.measureText(currentLabelText).width;
                 const maxLabelW = ctx.measureText(maxLabelText).width;
@@ -747,25 +749,17 @@
                 const currentRight = currentLabelX;
                 const maxLeft = maxLabelAlign === 'left' ? maxLabelX : (maxLabelX - maxLabelW);
                 const maxRight = maxLabelAlign === 'left' ? (maxLabelX + maxLabelW) : maxLabelX;
-                const labelsOverlap = !(currentRight < maxLeft || maxRight < currentLeft);
-
-                if (!isAtTheoretical && labelsOverlap) {
-                    // When labels are crowded, separate them vertically to avoid overlap.
-                    currentLabelY = baseLabelY - 9;
-                    maxLabelY = baseLabelY + 9;
-                }
-
                 if (!isAtTheoretical) {
                     ctx.textAlign = 'right';
-                    ctx.fillText(currentLabelText, currentLabelX, currentLabelY);
+                    ctx.fillText(currentLabelText, currentLabelX, baseLabelY);
                 }
 
                 if (maxLabelAlign === 'left') {
                     ctx.textAlign = 'left';
-                    ctx.fillText(maxLabelText, maxLabelX, maxLabelY);
+                    ctx.fillText(maxLabelText, maxLabelX, baseLabelY);
                 } else {
                     ctx.textAlign = 'right';
-                    ctx.fillText(maxLabelText, maxLabelX, maxLabelY);
+                    ctx.fillText(maxLabelText, maxLabelX, baseLabelY);
                 }
 
                 currentY += rowHeight;
