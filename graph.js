@@ -492,23 +492,34 @@
 
         const overallRating = Number(playerData.rating);
 
-        // Calculate rating extremes for X-axis
-        let minRating = overallRating;
-        let maxRating = overallRating;
+        // Calculate rating extremes for X-axis from actual rating values.
+        // Includes song current rating, song SSS+ rating, and player's current overall rating.
         const allSongs = [...bestList, ...recentList];
-
+        const ratingPoints = [overallRating];
         allSongs.forEach(song => {
-            const sssPlus = (song.const || 0) + 2.15;
-            if (song.rating < minRating) minRating = song.rating;
-            if (sssPlus < minRating) minRating = sssPlus;
-            if (song.rating > maxRating) maxRating = song.rating;
-            if (sssPlus > maxRating) maxRating = sssPlus;
+            ratingPoints.push(Number(song.rating));
+            ratingPoints.push(Number(song.const || 0) + 2.15);
         });
 
-        // Give some padding on extremes
-        const ratingRange = maxRating - minRating || 1;
-        minRating = minRating - (ratingRange * 0.05);
-        maxRating = maxRating + (ratingRange * 0.05);
+        let minRating = Math.min(...ratingPoints);
+        let maxRating = Math.max(...ratingPoints);
+        let ratingRange = maxRating - minRating;
+
+        if (!Number.isFinite(minRating) || !Number.isFinite(maxRating)) {
+            minRating = 0;
+            maxRating = 1;
+            ratingRange = 1;
+        } else if (ratingRange === 0) {
+            minRating -= 0.5;
+            maxRating += 0.5;
+            ratingRange = 1;
+        } else {
+            // Keep a small visual margin while preserving min/max-based scaling.
+            const axisMargin = Math.max(0.02, ratingRange * 0.015);
+            minRating -= axisMargin;
+            maxRating += axisMargin;
+            ratingRange = maxRating - minRating;
+        }
 
         // Draw Title
         ctx.fillStyle = "#ffffff";
