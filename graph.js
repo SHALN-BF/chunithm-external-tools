@@ -472,215 +472,215 @@
         });
     };
 
-    
-const generateImage = async (playerData, bestList, recentList, mode) => {
-    updateMessage("グラフを生成中...");
 
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    const generateImage = async (playerData, bestList, recentList, mode) => {
+        updateMessage("グラフを生成中...");
 
-    const width = 1200;
-    // 30 BEST + 10 RECENT = 40 songs. 
-    // each item: 40px height + 10px gap = 50px
-    // header: 150px
-    // separator: 100px
-    // bottom margin: 100px
-    const height = 150 + (30 * 50) + 100 + (10 * 50) + 100;
-    canvas.width = width;
-    canvas.height = height;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
 
-    // Fill background
-    ctx.fillStyle = "#1e1e1e";
-    ctx.fillRect(0, 0, width, height);
+        const width = 1200;
+        // 30 BEST + 10 RECENT = 40 songs. 
+        // each item: 40px height + 10px gap = 50px
+        // header: 150px
+        // separator: 100px
+        // bottom margin: 100px
+        const height = 150 + (30 * 50) + 100 + (10 * 50) + 100;
+        canvas.width = width;
+        canvas.height = height;
 
-    const overallRating = Number(playerData.rating);
+        // Fill background
+        ctx.fillStyle = "#1e1e1e";
+        ctx.fillRect(0, 0, width, height);
 
-    // Calculate rating extremes for X-axis
-    let minRating = overallRating;
-    let maxRating = overallRating;
-    const allSongs = [...bestList, ...recentList];
-    
-    allSongs.forEach(song => {
-        if (song.rating < minRating) minRating = song.rating;
-        const sssPlus = (song.constant || 0) + 2.15;
-        if (sssPlus > maxRating) maxRating = sssPlus;
-    });
+        const overallRating = Number(playerData.rating);
 
-    // Give some padding on extremes
-    minRating = Math.floor(minRating * 4) / 4 - 0.25; 
-    maxRating = Math.ceil(maxRating * 4) / 4 + 0.25;
-    
-    // Draw Title
-    ctx.fillStyle = "#ffffff";
-    ctx.font = 'bold 40px "Noto Sans JP", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`CHUNITHM BEST/RECENT GRAPH - ${playerData.name} (Rating: ${playerData.rating})`, 50, 50);
+        // Calculate rating extremes for X-axis
+        let minRating = overallRating;
+        let maxRating = overallRating;
+        const allSongs = [...bestList, ...recentList];
 
-    const marginLeft = 350;
-    const marginRight = 50;
-    const graphWidth = width - marginLeft - marginRight;
+        allSongs.forEach(song => {
+            if (song.rating < minRating) minRating = song.rating;
+            const sssPlus = (song.constant || 0) + 2.15;
+            if (sssPlus > maxRating) maxRating = sssPlus;
+        });
 
-    const plotX = (val) => {
-        let normalized = (val - minRating) / (maxRating - minRating);
-        return marginLeft + Math.max(0, Math.min(1, normalized)) * graphWidth;
-    };
+        // Give some padding on extremes
+        minRating = Math.floor(minRating * 4) / 4 - 0.25;
+        maxRating = Math.ceil(maxRating * 4) / 4 + 0.25;
 
-    // Draw Grid Lines
-    ctx.font = '20px Arial';
-    ctx.fillStyle = "#888888";
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    // Draw grid marks from minRating to maxRating with 0.1 intervals
-    for (let r = Math.ceil(minRating * 10) / 10; r <= maxRating; r += 0.1) {
-        let x = plotX(r);
-        ctx.beginPath();
-        ctx.moveTo(x, 120);
-        ctx.lineTo(x, height - 50);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        ctx.fillText(r.toFixed(2), x, 140);
-    }
-
-    // Process lists
-    let currentY = 180;
-
-    const drawSection = (title, list) => {
+        // Draw Title
         ctx.fillStyle = "#ffffff";
-        ctx.font = 'bold 30px "Noto Sans JP", sans-serif';
+        ctx.font = 'bold 40px "Noto Sans JP", sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(title, 50, currentY);
-        currentY += 50;
+        ctx.fillText(`CHUNITHM BEST/RECENT GRAPH - ${playerData.name} (Rating: ${playerData.rating})`, 50, 50);
 
-        for (let i = 0; i < list.length; i++) {
-            const song = list[i];
-            const sssPlus = (song.constant || 0) + 2.15;
-            
-            // Draw text (Title & Diff)
+        const marginLeft = 350;
+        const marginRight = 50;
+        const graphWidth = width - marginLeft - marginRight;
+
+        const plotX = (val) => {
+            let normalized = (val - minRating) / (maxRating - minRating);
+            return marginLeft + Math.max(0, Math.min(1, normalized)) * graphWidth;
+        };
+
+        // Draw Grid Lines
+        ctx.font = '20px Arial';
+        ctx.fillStyle = "#888888";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        // Draw grid marks from minRating to maxRating with 0.1 intervals
+        for (let r = Math.ceil(minRating * 10) / 10; r <= maxRating; r += 0.1) {
+            let x = plotX(r);
+            ctx.beginPath();
+            ctx.moveTo(x, 120);
+            ctx.lineTo(x, height - 50);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillText(r.toFixed(2), x, 140);
+        }
+
+        // Process lists
+        let currentY = 180;
+
+        const drawSection = (title, list) => {
             ctx.fillStyle = "#ffffff";
-            ctx.font = '22px "Noto Sans JP", sans-serif';
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'middle';
-            
-            let displayTitle = song.title;
-            if (displayTitle.length > 18) displayTitle = displayTitle.substring(0, 17) + '...';
-            
-            ctx.fillText(`${i+1}. ${displayTitle}`, marginLeft - 10, currentY + 15);
-
-            // X coordinates
-            const xBase = marginLeft;
-            const xSSSPlus = plotX(sssPlus);
-            const xRating = plotX(song.rating);
-            
-            // Draw SSS+ bar (Light Color)
-            const diffColors = {
-                'MAS': { light: 'rgba(156, 39, 176, 0.4)', dark: 'rgba(156, 39, 176, 1)' },
-                'EXP': { light: 'rgba(244, 67, 54, 0.4)', dark: 'rgba(244, 67, 54, 1)' },
-                'ULT': { light: 'rgba(0, 0, 0, 0.4)', dark: 'rgba(200, 200, 200, 1)' },
-                'ADV': { light: 'rgba(255, 152, 0, 0.4)', dark: 'rgba(255, 152, 0, 1)' },
-                'BAS': { light: 'rgba(76, 175, 80, 0.4)', dark: 'rgba(76, 175, 80, 1)' }
-            };
-            const diffAbbr = song.difficulty === 'MASTER' ? 'MAS' : 
-                             song.difficulty === 'EXPERT' ? 'EXP' : 
-                             song.difficulty === 'ULTIMA' ? 'ULT' : 
-                             song.difficulty === 'ADVANCED' ? 'ADV' : 'BAS';
-            
-            const colorSet = diffColors[diffAbbr] || { light: 'rgba(100,100,100,0.5)', dark: 'rgba(200,200,200,1)' };
-            
-            const barHeight = 26;
-            const barY = currentY + 15 - barHeight / 2;
-
-            // SSS+ (Light)
-            ctx.fillStyle = colorSet.light;
-            ctx.fillRect(xBase, barY, xSSSPlus - xBase, barHeight);
-
-            // Current (Dark)
-            ctx.fillStyle = colorSet.dark;
-            ctx.fillRect(xBase, barY, xRating - xBase, barHeight);
-
-            // Value text
-            ctx.fillStyle = "#ffffff";
-            ctx.font = '16px Arial';
+            ctx.font = 'bold 30px "Noto Sans JP", sans-serif';
             ctx.textAlign = 'left';
-            ctx.fillText(`${song.rating.toFixed(2)} / ${sssPlus.toFixed(2)}`, Math.max(xRating, xBase) + 8, currentY + 15);
+            ctx.textBaseline = 'top';
+            ctx.fillText(title, 50, currentY);
+            currentY += 50;
 
-            currentY += 45;
+            for (let i = 0; i < list.length; i++) {
+                const song = list[i];
+                const sssPlus = (song.constant || 0) + 2.15;
+
+                // Draw text (Title & Diff)
+                ctx.fillStyle = "#ffffff";
+                ctx.font = '22px "Noto Sans JP", sans-serif';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+
+                let displayTitle = song.title;
+                if (displayTitle.length > 18) displayTitle = displayTitle.substring(0, 17) + '...';
+
+                ctx.fillText(`${i + 1}. ${displayTitle}`, marginLeft - 10, currentY + 15);
+
+                // X coordinates
+                const xBase = marginLeft;
+                const xSSSPlus = plotX(sssPlus);
+                const xRating = plotX(song.rating);
+
+                // Draw SSS+ bar (Light Color)
+                const diffColors = {
+                    'MAS': { light: 'rgba(156, 39, 176, 0.4)', dark: 'rgba(156, 39, 176, 1)' },
+                    'EXP': { light: 'rgba(244, 67, 54, 0.4)', dark: 'rgba(244, 67, 54, 1)' },
+                    'ULT': { light: 'rgba(0, 0, 0, 0.4)', dark: 'rgba(200, 200, 200, 1)' },
+                    'ADV': { light: 'rgba(255, 152, 0, 0.4)', dark: 'rgba(255, 152, 0, 1)' },
+                    'BAS': { light: 'rgba(76, 175, 80, 0.4)', dark: 'rgba(76, 175, 80, 1)' }
+                };
+                const diffAbbr = song.difficulty === 'MASTER' ? 'MAS' :
+                    song.difficulty === 'EXPERT' ? 'EXP' :
+                        song.difficulty === 'ULTIMA' ? 'ULT' :
+                            song.difficulty === 'ADVANCED' ? 'ADV' : 'BAS';
+
+                const colorSet = diffColors[diffAbbr] || { light: 'rgba(100,100,100,0.5)', dark: 'rgba(200,200,200,1)' };
+
+                const barHeight = 26;
+                const barY = currentY + 15 - barHeight / 2;
+
+                // SSS+ (Light)
+                ctx.fillStyle = colorSet.light;
+                ctx.fillRect(xBase, barY, xSSSPlus - xBase, barHeight);
+
+                // Current (Dark)
+                ctx.fillStyle = colorSet.dark;
+                ctx.fillRect(xBase, barY, xRating - xBase, barHeight);
+
+                // Value text
+                ctx.fillStyle = "#ffffff";
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`${song.rating.toFixed(2)} / ${sssPlus.toFixed(2)}`, Math.max(xRating, xBase) + 8, currentY + 15);
+
+                currentY += 45;
+            }
+        };
+
+        drawSection("BEST枠", bestList);
+        currentY += 40;
+        drawSection("新曲枠", recentList);
+
+        // Draw overall rating line
+        const xOverall = plotX(overallRating);
+        ctx.beginPath();
+        ctx.moveTo(xOverall, 150);
+        ctx.lineTo(xOverall, currentY);
+        ctx.strokeStyle = "#FFFF00";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = "#FFFF00";
+        ctx.font = 'bold 20px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`現在レート: ${overallRating.toFixed(2)}`, xOverall, currentY + 20);
+
+        // Display image logic
+        const dataUrl = canvas.toDataURL('image/png');
+
+        const resultImage = document.createElement('img');
+        resultImage.src = dataUrl;
+        resultImage.style.cssText = 'width: 100%; max-width: 800px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: block; margin: 0 auto;';
+
+        const currentOverlay = document.querySelector('div[style*="top: 0px;"]');
+        if (currentOverlay) {
+            currentOverlay.innerHTML = '';
+            currentOverlay.style.overflowY = 'auto'; // allow scrolling
+
+            const resultContainer = document.createElement('div');
+            resultContainer.style.cssText = 'width: 90%; max-width: 900px; background: #fff; padding: 20px; border-radius: 15px; text-align: center; position: relative; margin: 50px auto;';
+
+            const title = document.createElement('h2');
+            title.innerText = 'グラフ生成完了！';
+            title.style.cssText = 'color: #333; margin-bottom: 20px; font-family: sans-serif;';
+
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = 'margin-top: 20px; display: flex; justify-content: center; gap: 15px;';
+
+            const createActionButton = (text, bgColor) => {
+                const btn = document.createElement('button');
+                btn.innerText = text;
+                btn.style.cssText = `padding: 10px 20px; border: none; border-radius: 20px; background-color: ${bgColor}; color: white; cursor: pointer; font-size: 16px; font-weight: bold; transition: opacity 0.2s;`;
+                btn.onmouseover = () => btn.style.opacity = '0.8';
+                btn.onmouseout = () => btn.style.opacity = '1';
+                return btn;
+            };
+
+            const saveButton = createActionButton('画像を保存', '#4CAF50');
+            saveButton.onclick = () => {
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = `chunithm-graph-${Date.now()}.png`;
+                a.click();
+            };
+
+            const closeButton = createActionButton('閉じる', '#f44336');
+            closeButton.onclick = () => document.body.removeChild(currentOverlay);
+
+            buttonContainer.appendChild(saveButton);
+            buttonContainer.appendChild(closeButton);
+            resultContainer.appendChild(title);
+            resultContainer.appendChild(resultImage);
+            resultContainer.appendChild(buttonContainer);
+            currentOverlay.appendChild(resultContainer);
         }
     };
-
-    drawSection("BEST枠", bestList);
-    currentY += 40;
-    drawSection("新曲枠", recentList);
-
-    // Draw overall rating line
-    const xOverall = plotX(overallRating);
-    ctx.beginPath();
-    ctx.moveTo(xOverall, 150);
-    ctx.lineTo(xOverall, currentY);
-    ctx.strokeStyle = "#FFFF00";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    
-    ctx.fillStyle = "#FFFF00";
-    ctx.font = 'bold 20px "Noto Sans JP", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(`現在レート: ${overallRating.toFixed(2)}`, xOverall, currentY + 20);
-
-    // Display image logic
-    const dataUrl = canvas.toDataURL('image/png');
-
-    const resultImage = document.createElement('img');
-    resultImage.src = dataUrl;
-    resultImage.style.cssText = 'width: 100%; max-width: 800px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: block; margin: 0 auto;';
-
-    const currentOverlay = document.querySelector('div[style*="top: 0px;"]');
-    if (currentOverlay) {
-        currentOverlay.innerHTML = '';
-        currentOverlay.style.overflowY = 'auto'; // allow scrolling
-
-        const resultContainer = document.createElement('div');
-        resultContainer.style.cssText = 'width: 90%; max-width: 900px; background: #fff; padding: 20px; border-radius: 15px; text-align: center; position: relative; margin: 50px auto;';
-
-        const title = document.createElement('h2');
-        title.innerText = 'グラフ生成完了！';
-        title.style.cssText = 'color: #333; margin-bottom: 20px; font-family: sans-serif;';
-        
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = 'margin-top: 20px; display: flex; justify-content: center; gap: 15px;';
-
-        const createActionButton = (text, bgColor) => {
-            const btn = document.createElement('button');
-            btn.innerText = text;
-            btn.style.cssText = `padding: 10px 20px; border: none; border-radius: 20px; background-color: ${bgColor}; color: white; cursor: pointer; font-size: 16px; font-weight: bold; transition: opacity 0.2s;`;
-            btn.onmouseover = () => btn.style.opacity = '0.8';
-            btn.onmouseout = () => btn.style.opacity = '1';
-            return btn;
-        };
-
-        const saveButton = createActionButton('画像を保存', '#4CAF50');
-        saveButton.onclick = () => {
-            const a = document.createElement('a');
-            a.href = dataUrl;
-            a.download = `chunithm-graph-${Date.now()}.png`;
-            a.click();
-        };
-
-        const closeButton = createActionButton('閉じる', '#f44336');
-        closeButton.onclick = () => document.body.removeChild(currentOverlay);
-
-        buttonContainer.appendChild(saveButton);
-        buttonContainer.appendChild(closeButton);
-        resultContainer.appendChild(title);
-        resultContainer.appendChild(resultImage);
-        resultContainer.appendChild(buttonContainer);
-        currentOverlay.appendChild(resultContainer);
-    }
-};
 
     // --- メイン処理 ---
 
