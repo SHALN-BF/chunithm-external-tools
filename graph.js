@@ -654,26 +654,6 @@
                 ctx.fillStyle = colorSet.dark;
                 ctx.fillRect(xBase, barY, xRating - xBase, barHeight);
 
-                const stripeHeight = barHeight * (3 / 7);
-                const stripeY = barY + ((barHeight - stripeHeight) / 2);
-                const stripeWidth = Math.max(0, xSSSPlus - xBase);
-
-                // Center stripe: rainbow only for achieved SSS+, otherwise difficulty color.
-                if (isAtTheoretical) {
-                    const rainbowGradient = ctx.createLinearGradient(xBase, 0, xSSSPlus, 0);
-                    rainbowGradient.addColorStop(0.00, 'rgba(255, 64, 64, 0.95)');
-                    rainbowGradient.addColorStop(0.17, 'rgba(255, 160, 64, 0.95)');
-                    rainbowGradient.addColorStop(0.34, 'rgba(255, 235, 64, 0.95)');
-                    rainbowGradient.addColorStop(0.51, 'rgba(64, 220, 96, 0.95)');
-                    rainbowGradient.addColorStop(0.68, 'rgba(64, 170, 255, 0.95)');
-                    rainbowGradient.addColorStop(0.85, 'rgba(120, 120, 255, 0.95)');
-                    rainbowGradient.addColorStop(1.00, 'rgba(190, 90, 255, 0.95)');
-                    ctx.fillStyle = rainbowGradient;
-                } else {
-                    ctx.fillStyle = colorSet.dark;
-                }
-                ctx.fillRect(xBase, stripeY, stripeWidth, stripeHeight);
-
                 // Highlight constant anchors (top-most, thicker)
                 ctx.strokeStyle = 'rgba(120, 200, 255, 0.95)';
                 ctx.lineWidth = 3.6;
@@ -689,36 +669,34 @@
                 ctx.lineTo(xConstPlusOne, barY + barHeight + 5);
                 ctx.stroke();
 
-                // Current rating marker (always keep)
+                const stripeHeight = barHeight * (3 / 7);
+                const stripeY = barY + ((barHeight - stripeHeight) / 2);
+                const stripeEndX = Math.max(xBase, Math.min(xRating, xSSSPlus));
+                const stripeWidth = Math.max(0, stripeEndX - xBase);
+
+                // Center stripe (top-most): rainbow only for achieved SSS+, otherwise difficulty color.
+                if (isAtTheoretical) {
+                    const rainbowGradient = ctx.createLinearGradient(xBase, 0, xSSSPlus, 0);
+                    rainbowGradient.addColorStop(0.00, 'rgba(255, 64, 64, 0.95)');
+                    rainbowGradient.addColorStop(0.17, 'rgba(255, 160, 64, 0.95)');
+                    rainbowGradient.addColorStop(0.34, 'rgba(255, 235, 64, 0.95)');
+                    rainbowGradient.addColorStop(0.51, 'rgba(64, 220, 96, 0.95)');
+                    rainbowGradient.addColorStop(0.68, 'rgba(64, 170, 255, 0.95)');
+                    rainbowGradient.addColorStop(0.85, 'rgba(120, 120, 255, 0.95)');
+                    rainbowGradient.addColorStop(1.00, 'rgba(190, 90, 255, 0.95)');
+                    ctx.fillStyle = rainbowGradient;
+                } else {
+                    ctx.fillStyle = colorSet.dark;
+                }
+                ctx.fillRect(xBase, stripeY, stripeWidth, stripeHeight);
+
+                // Current rating marker (top-most)
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
                 ctx.lineWidth = 3.2;
                 ctx.beginPath();
                 ctx.moveTo(xRating, barY - 5);
                 ctx.lineTo(xRating, barY + barHeight + 5);
                 ctx.stroke();
-
-                // If current rating reaches SSS+ theoretical value, add rainbow glow
-                if (isAtTheoretical) {
-                    const glowGradient = ctx.createLinearGradient(0, barY - 7, 0, barY + barHeight + 7);
-                    glowGradient.addColorStop(0.00, 'rgba(255, 64, 64, 0.95)');
-                    glowGradient.addColorStop(0.17, 'rgba(255, 160, 64, 0.95)');
-                    glowGradient.addColorStop(0.34, 'rgba(255, 235, 64, 0.95)');
-                    glowGradient.addColorStop(0.51, 'rgba(64, 220, 96, 0.95)');
-                    glowGradient.addColorStop(0.68, 'rgba(64, 170, 255, 0.95)');
-                    glowGradient.addColorStop(0.85, 'rgba(120, 120, 255, 0.95)');
-                    glowGradient.addColorStop(1.00, 'rgba(190, 90, 255, 0.95)');
-
-                    ctx.save();
-                    ctx.strokeStyle = glowGradient;
-                    ctx.lineWidth = 6.2;
-                    ctx.shadowColor = 'rgba(255, 255, 255, 0.85)';
-                    ctx.shadowBlur = 10;
-                    ctx.beginPath();
-                    ctx.moveTo(xRating, barY - 7);
-                    ctx.lineTo(xRating, barY + barHeight + 7);
-                    ctx.stroke();
-                    ctx.restore();
-                }
 
                 // Value text
                 ctx.fillStyle = "#ffffff";
