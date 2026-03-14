@@ -480,12 +480,7 @@
         const ctx = canvas.getContext('2d');
 
         const width = 1200;
-        // 30 BEST + 10 RECENT = 40 songs. 
-        // each item: 40px height + 10px gap = 50px
-        // header: 150px
-        // separator: 100px
-        // bottom margin: 100px
-        const height = 150 + (30 * 50) + 100 + (10 * 50) + 100;
+        const height = 150 + (bestList.length * 45) + 100 + (recentList.length * 45) + 100;
         canvas.width = width;
         canvas.height = height;
 
@@ -501,14 +496,17 @@
         const allSongs = [...bestList, ...recentList];
 
         allSongs.forEach(song => {
+            const sssPlus = (song.const || 0) + 2.15;
             if (song.rating < minRating) minRating = song.rating;
-            const sssPlus = (song.constant || 0) + 2.15;
+            if (sssPlus < minRating) minRating = sssPlus;
+            if (song.rating > maxRating) maxRating = song.rating;
             if (sssPlus > maxRating) maxRating = sssPlus;
         });
 
         // Give some padding on extremes
-        minRating = Math.floor(minRating * 4) / 4 - 0.25;
-        maxRating = Math.ceil(maxRating * 4) / 4 + 0.25;
+        const ratingRange = maxRating - minRating || 1;
+        minRating = minRating - (ratingRange * 0.05);
+        maxRating = maxRating + (ratingRange * 0.05);
 
         // Draw Title
         ctx.fillStyle = "#ffffff";
@@ -557,7 +555,7 @@
 
             for (let i = 0; i < list.length; i++) {
                 const song = list[i];
-                const sssPlus = (song.constant || 0) + 2.15;
+                const sssPlus = (song.const || 0) + 2.15;
 
                 // Draw text (Title & Diff)
                 ctx.fillStyle = "#ffffff";
@@ -642,13 +640,16 @@
         if (currentOverlay) {
             currentOverlay.innerHTML = '';
             currentOverlay.style.overflowY = 'auto'; // allow scrolling
+            currentOverlay.style.justifyContent = 'flex-start';
+            currentOverlay.style.paddingTop = '50px';
+            currentOverlay.style.paddingBottom = '50px';
 
             const resultContainer = document.createElement('div');
-            resultContainer.style.cssText = 'width: 90%; max-width: 900px; background: #fff; padding: 20px; border-radius: 15px; text-align: center; position: relative; margin: 50px auto;';
+            resultContainer.style.cssText = 'width: 90%; max-width: 900px; background: #2d2d2d; color: #fff; padding: 20px; border-radius: 15px; text-align: center; position: relative; margin: 0 auto;';
 
             const title = document.createElement('h2');
             title.innerText = 'グラフ生成完了！';
-            title.style.cssText = 'color: #333; margin-bottom: 20px; font-family: sans-serif;';
+            title.style.cssText = 'color: #fff; margin-bottom: 20px; font-family: sans-serif; margin-top: 0; padding-top: 20px;';
 
             const buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = 'margin-top: 20px; display: flex; justify-content: center; gap: 15px;';
