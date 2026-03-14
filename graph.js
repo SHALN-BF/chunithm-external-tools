@@ -529,13 +529,24 @@
             return marginLeft + Math.max(0, Math.min(1, normalized)) * graphWidth;
         };
 
+        const truncateTextToWidth = (text, maxWidth) => {
+            if (ctx.measureText(text).width <= maxWidth) return text;
+            let clipped = text;
+            while (clipped.length > 0 && ctx.measureText(clipped + '...').width > maxWidth) {
+                clipped = clipped.slice(0, -1);
+            }
+            return clipped + '...';
+        };
+
         // Draw Grid Lines
         ctx.font = '20px Arial';
         ctx.fillStyle = "#888888";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        // Draw grid marks from minRating to maxRating with 0.1 intervals
-        for (let r = Math.ceil(minRating * 10) / 10; r <= maxRating; r += 0.1) {
+        const tickStep = ratingRange <= 4 ? 0.25 : (ratingRange <= 8 ? 0.5 : 1.0);
+        const tickDecimals = tickStep < 1 ? 2 : 1;
+        const tickStart = Math.ceil(minRating / tickStep) * tickStep;
+        for (let r = tickStart; r <= maxRating + 1e-9; r += tickStep) {
             let x = plotX(r);
             ctx.beginPath();
             ctx.moveTo(x, 120);
@@ -544,7 +555,7 @@
             ctx.lineWidth = 1;
             ctx.stroke();
 
-            ctx.fillText(r.toFixed(2), x, 140);
+            ctx.fillText(r.toFixed(tickDecimals), x, 140);
         }
 
         // Process lists
@@ -560,21 +571,23 @@
 
             for (let i = 0; i < list.length; i++) {
                 const song = list[i];
+                const songConst = song.const || 0;
                 const sssPlus = (song.const || 0) + 2.15;
 
                 // Draw text (Title & Diff)
                 ctx.fillStyle = "#ffffff";
                 ctx.font = '22px "Noto Sans JP", sans-serif';
-                ctx.textAlign = 'right';
+                ctx.textAlign = 'left';
                 ctx.textBaseline = 'middle';
 
-                let displayTitle = song.title;
-                if (displayTitle.length > 18) displayTitle = displayTitle.substring(0, 17) + '...';
-
-                ctx.fillText(`${i + 1}. ${displayTitle}`, marginLeft - 10, currentY + 15);
+                const labelMaxWidth = marginLeft - 30;
+                const displayTitle = truncateTextToWidth(`${i + 1}. ${song.title}`, labelMaxWidth);
+                ctx.fillText(displayTitle, 20, currentY + 15);
 
                 // X coordinates
                 const xBase = marginLeft;
+                const xConst = plotX(songConst);
+                const xConstPlusOne = plotX(songConst + 1);
                 const xSSSPlus = plotX(sssPlus);
                 const xRating = plotX(song.rating);
 
@@ -595,6 +608,20 @@
 
                 const barHeight = isVertical ? 30 : 26;
                 const barY = currentY + 15 - barHeight / 2;
+
+                // Highlight constant anchors for this chart
+                ctx.strokeStyle = 'rgba(120, 200, 255, 0.55)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(xConst, barY - 4);
+                ctx.lineTo(xConst, barY + barHeight + 4);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255, 220, 120, 0.55)';
+                ctx.beginPath();
+                ctx.moveTo(xConstPlusOne, barY - 4);
+                ctx.lineTo(xConstPlusOne, barY + barHeight + 4);
+                ctx.stroke();
 
                 // SSS+ (Light)
                 ctx.fillStyle = colorSet.light;
@@ -639,12 +666,12 @@
 
         const resultImage = document.createElement('img');
         resultImage.src = dataUrl;
-        resultImage.style.cssText = `width: 100%; max-width: ${isVertical ? 760 : 1280}px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: block; margin: 0 auto;`;
+        resultImage.style.cssText = 'width: auto; max-width: none; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: block; margin: 0 auto;';
 
         const currentOverlay = document.querySelector('div[style*="top: 0px;"]');
         if (currentOverlay) {
             currentOverlay.innerHTML = '';
-            currentOverlay.style.overflowY = 'auto'; // allow scrolling
+            currentOverlay.style.overflow = 'auto';
             currentOverlay.style.justifyContent = 'flex-start';
             currentOverlay.style.paddingTop = '50px';
             currentOverlay.style.paddingBottom = '50px';
@@ -655,6 +682,10 @@
             const title = document.createElement('h2');
             title.innerText = 'グラフ生成完了！';
             title.style.cssText = 'color: #fff; margin-bottom: 20px; font-family: sans-serif; margin-top: 0; padding-top: 20px;';
+
+            const imageScrollArea = document.createElement('div');
+            imageScrollArea.style.cssText = 'max-height: 75vh; overflow: auto; padding: 8px; border-radius: 12px; background: rgba(0,0,0,0.2);';
+            imageScrollArea.appendChild(resultImage);
 
             const buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = 'margin-top: 20px; display: flex; justify-content: center; gap: 15px;';
@@ -682,7 +713,7 @@
             buttonContainer.appendChild(saveButton);
             buttonContainer.appendChild(closeButton);
             resultContainer.appendChild(title);
-            resultContainer.appendChild(resultImage);
+            resultContainer.appendChild(imageScrollArea);
             resultContainer.appendChild(buttonContainer);
             currentOverlay.appendChild(resultContainer);
         }
