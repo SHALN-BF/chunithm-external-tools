@@ -147,7 +147,7 @@
             const delayControls = document.createElement('div');
             delayControls.style.cssText = 'display: flex; justify-content: center; align-items: center;';
             const delayValueSpan = document.createElement('span');
-            delayValueSpan.textContent = scrapeDelay.toFixed(2);
+            delayValueSpan.textContent = scrapeDelay.toFixed(1);
             delayValueSpan.style.cssText = 'font-size: 24px; font-weight: bold; color: white; width: 80px;';
             const createControlButton = (text) => {
                 const button = document.createElement('button');
@@ -616,7 +616,7 @@
                 ctx.textBaseline = 'middle';
 
                 const labelMaxWidth = marginLeft - 30;
-                const labelText = `${i + 1}. [定数 ${songConst.toFixed(1)}] ${song.title}`;
+                const labelText = `${songConst.toFixed(2)} | ${song.title}`;
                 const displayTitle = truncateTextToWidth(labelText, labelMaxWidth);
                 ctx.fillText(displayTitle, 20, currentY + 15);
 
@@ -669,7 +669,7 @@
                 ctx.lineTo(xConstPlusOne, barY + barHeight + 5);
                 ctx.stroke();
 
-                const stripeHeight = barHeight * (4 / 7);
+                const stripeHeight = barHeight * (5 / 7);
                 const stripeY = barY + ((barHeight - stripeHeight) / 2);
                 const stripeEndX = Math.max(xBase, Math.min(xRating, xSSSPlus));
                 const stripeWidth = Math.max(0, stripeEndX - xBase);
