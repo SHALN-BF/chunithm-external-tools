@@ -3,6 +3,18 @@ from taka-4602/chunithm-best-generator
 * 本ツールの使用にはゲキチュウマイ-NET利用権(スタンダード以上)が必須です。
 * 本ツールを使用する過程及び結果における如何なる損害も自己責任の上ご利用ください。
 * 本ツールはあくまでもより快適なCHUNITHMのためのツールであり、CHUNITHM-NETサーバーなどへの不正/過剰なアクセスは避けてください。
+
+## 画像ジェネ
+べ枠/新曲枠の画像のサムネを生成します。デフォルトで1分弱。
+表示するもの
+* それぞれの枠に入っている曲
+    * そいつらの→
+    * サムネ
+    * タイトル
+    * スコアとRANK
+    * 定数
+    * プレイ回数
+    * レート
 ```js
 javascript:(function(){
     const script = document.createElement('script');
@@ -11,8 +23,9 @@ javascript:(function(){
 })();
 ```
 
-## グラフ機能
-以下をブックマークに登録すると、各楽曲のSSS+時のレートと現在のレートを比較するグラフを生成できます。
+## レート計算機
+それぞれのレートを読んでグラフを出してくれるｿﾞ
+
 ```js
 javascript:(function(){
     const script = document.createElement('script');

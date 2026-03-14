@@ -544,6 +544,10 @@
         const bestStats = calcRatingStats(bestRatings);
         const recentStats = calcRatingStats(recentRatings);
         const allStats = calcRatingStats(allRatings);
+        const bestMinRating = bestRatings.length > 0 ? Math.min(...bestRatings) : 0;
+        const recentMinRating = recentRatings.length > 0 ? Math.min(...recentRatings) : 0;
+        const bestConstLowerBound = bestMinRating - 2.15;
+        const recentConstLowerBound = recentMinRating - 2.15;
 
         // Draw Title
         ctx.fillStyle = "#ffffff";
@@ -789,7 +793,7 @@
         ctx.fillText(`現在レート: ${overallRating.toFixed(2)}`, xOverall, currentY + 20);
 
         const statsBoxWidth = isVertical ? Math.min(width - 52, 760) : Math.min(width - 52, 960);
-        const statsBoxHeight = 132;
+        const statsBoxHeight = 160;
         const statsLineHeight = 28;
         const statsX = 26;
         const statsY = height - statsBoxHeight - 24;
@@ -811,6 +815,7 @@
         ctx.fillText(`BEST平均RATING: ${bestStats.avg.toFixed(4)} / 標準偏差: ${bestStats.std.toFixed(4)}`, statsX + 14, statsY + 38);
         ctx.fillText(`新曲平均RATING: ${recentStats.avg.toFixed(4)} / 標準偏差: ${recentStats.std.toFixed(4)}`, statsX + 14, statsY + 38 + statsLineHeight);
         ctx.fillText(`全体標準偏差(現在レート込): ${allStats.std.toFixed(4)}  |  現在レート: ${overallRating.toFixed(4)}`, statsX + 14, statsY + 38 + (statsLineHeight * 2));
+        ctx.fillText(`更新関与の定数下限(BEST/新曲): ${bestConstLowerBound.toFixed(4)} / ${recentConstLowerBound.toFixed(4)}`, statsX + 14, statsY + 38 + (statsLineHeight * 3));
 
         // Display image logic
         const dataUrl = canvas.toDataURL('image/png');
