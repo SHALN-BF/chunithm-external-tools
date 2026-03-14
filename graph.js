@@ -487,7 +487,8 @@
         const graphWidth = Math.round(baseGraphAreaWidth * 1.2);
         const marginRight = 50;
         const width = marginLeft + graphWidth + marginRight;
-        const height = (isVertical ? 200 : 170) + (bestList.length * rowHeight) + 100 + (recentList.length * rowHeight) + 110;
+        const statsPanelHeight = 170;
+        const height = (isVertical ? 200 : 170) + (bestList.length * rowHeight) + 100 + (recentList.length * rowHeight) + 110 + statsPanelHeight;
         canvas.width = width;
         canvas.height = height;
 
@@ -538,7 +539,7 @@
 
         const bestRatings = bestList.map(song => Number(song.rating));
         const recentRatings = recentList.map(song => Number(song.rating));
-        const allRatings = [...bestRatings, ...recentRatings];
+        const allRatings = [...bestRatings, ...recentRatings, overallRating];
 
         const bestStats = calcRatingStats(bestRatings);
         const recentStats = calcRatingStats(recentRatings);
@@ -553,30 +554,6 @@
         ctx.font = 'bold 30px "Noto Sans JP", sans-serif';
         ctx.fillText(`${playerData.name}`, 50, 82);
         ctx.fillText(`Rating: ${playerData.rating}`, 50, 122);
-
-        const statsBoxWidth = isVertical ? 430 : 520;
-        const statsX = width - statsBoxWidth - 26;
-        const statsY = 28;
-        const statsLineHeight = 28;
-        const statsBoxHeight = 152;
-
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
-        ctx.fillRect(statsX, statsY, statsBoxWidth, statsBoxHeight);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(statsX, statsY, statsBoxWidth, statsBoxHeight);
-
-        ctx.fillStyle = '#D8E9FF';
-        ctx.font = 'bold 22px "Noto Sans JP", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText('統計', statsX + 14, statsY + 10);
-
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = '18px "Noto Sans JP", sans-serif';
-        ctx.fillText(`BEST平均RATING: ${bestStats.avg.toFixed(4)}  /  標準偏差: ${bestStats.std.toFixed(4)}`, statsX + 14, statsY + 42);
-        ctx.fillText(`新曲平均RATING: ${recentStats.avg.toFixed(4)}  /  標準偏差: ${recentStats.std.toFixed(4)}`, statsX + 14, statsY + 42 + statsLineHeight);
-        ctx.fillText(`全体標準偏差: ${allStats.std.toFixed(4)}`, statsX + 14, statsY + 42 + (statsLineHeight * 2));
 
         const plotX = (val) => {
             let normalized = (val - minRating) / (maxRating - minRating);
@@ -635,7 +612,7 @@
                 ctx.textBaseline = 'middle';
 
                 const labelMaxWidth = marginLeft - 30;
-                const labelText = `${song.rating.toFixed(2)} | ${i + 1}. ${song.title}`;
+                const labelText = `${i + 1}. ${song.title}`;
                 const displayTitle = truncateTextToWidth(labelText, labelMaxWidth);
                 ctx.fillText(displayTitle, 20, currentY + 15);
 
@@ -664,20 +641,6 @@
                 const barHeight = isVertical ? 30 : 26;
                 const barY = currentY + 15 - barHeight / 2;
 
-                // Highlight constant anchors for this chart
-                ctx.strokeStyle = 'rgba(120, 200, 255, 0.55)';
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.moveTo(xConst, barY - 4);
-                ctx.lineTo(xConst, barY + barHeight + 4);
-                ctx.stroke();
-
-                ctx.strokeStyle = 'rgba(255, 220, 120, 0.55)';
-                ctx.beginPath();
-                ctx.moveTo(xConstPlusOne, barY - 4);
-                ctx.lineTo(xConstPlusOne, barY + barHeight + 4);
-                ctx.stroke();
-
                 // SSS+ (Light)
                 ctx.fillStyle = colorSet.light;
                 ctx.fillRect(xBase, barY, xSSSPlus - xBase, barHeight);
@@ -686,26 +649,57 @@
                 ctx.fillStyle = colorSet.dark;
                 ctx.fillRect(xBase, barY, xRating - xBase, barHeight);
 
-                // Highlight current rating and SSS+ rating lines (top-most, thicker)
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-                ctx.lineWidth = 3.2;
+                // Hypothetical SSS+ stripe (rainbow, centered, 3/7 bar thickness)
+                const rainbowHeight = barHeight * (3 / 7);
+                const rainbowY = barY + ((barHeight - rainbowHeight) / 2);
+                const rainbowGradient = ctx.createLinearGradient(xBase, 0, xSSSPlus, 0);
+                rainbowGradient.addColorStop(0.00, 'rgba(255, 64, 64, 0.95)');
+                rainbowGradient.addColorStop(0.17, 'rgba(255, 160, 64, 0.95)');
+                rainbowGradient.addColorStop(0.34, 'rgba(255, 235, 64, 0.95)');
+                rainbowGradient.addColorStop(0.51, 'rgba(64, 220, 96, 0.95)');
+                rainbowGradient.addColorStop(0.68, 'rgba(64, 170, 255, 0.95)');
+                rainbowGradient.addColorStop(0.85, 'rgba(120, 120, 255, 0.95)');
+                rainbowGradient.addColorStop(1.00, 'rgba(190, 90, 255, 0.95)');
+                ctx.fillStyle = rainbowGradient;
+                ctx.fillRect(xBase, rainbowY, Math.max(0, xSSSPlus - xBase), rainbowHeight);
+
+                // Highlight constant anchors (top-most, thicker)
+                ctx.strokeStyle = 'rgba(120, 200, 255, 0.95)';
+                ctx.lineWidth = 3.6;
                 ctx.beginPath();
-                ctx.moveTo(xRating, barY - 5);
-                ctx.lineTo(xRating, barY + barHeight + 5);
+                ctx.moveTo(xConst, barY - 5);
+                ctx.lineTo(xConst, barY + barHeight + 5);
                 ctx.stroke();
 
-                ctx.strokeStyle = 'rgba(255, 214, 10, 0.95)';
-                ctx.lineWidth = 3.2;
+                ctx.strokeStyle = 'rgba(255, 220, 120, 0.95)';
+                ctx.lineWidth = 3.6;
                 ctx.beginPath();
-                ctx.moveTo(xSSSPlus, barY - 5);
-                ctx.lineTo(xSSSPlus, barY + barHeight + 5);
+                ctx.moveTo(xConstPlusOne, barY - 5);
+                ctx.lineTo(xConstPlusOne, barY + barHeight + 5);
                 ctx.stroke();
 
                 // Value text
                 ctx.fillStyle = "#ffffff";
                 ctx.font = '16px Arial';
-                ctx.textAlign = 'left';
-                ctx.fillText(`${song.rating.toFixed(2)} / ${sssPlus.toFixed(2)}`, Math.max(xRating, xBase) + 8, currentY + 15);
+                ctx.textBaseline = 'middle';
+
+                // Current rating label: left side of current marker
+                ctx.textAlign = 'right';
+                const currentLabelX = Math.max(xBase + 48, xRating - 8);
+                ctx.fillText(`${song.rating.toFixed(2)}`, currentLabelX, currentY + 15);
+
+                // Max(theoretical SSS+) label: right side of theoretical marker
+                const maxLabelText = `${sssPlus.toFixed(2)}`;
+                const maxLabelNaturalX = xSSSPlus + 8;
+                const maxLabelW = ctx.measureText(maxLabelText).width;
+                const maxLabelLimitX = width - 12;
+                if (maxLabelNaturalX + maxLabelW <= maxLabelLimitX) {
+                    ctx.textAlign = 'left';
+                    ctx.fillText(maxLabelText, maxLabelNaturalX, currentY + 15);
+                } else {
+                    ctx.textAlign = 'right';
+                    ctx.fillText(maxLabelText, maxLabelLimitX, currentY + 15);
+                }
 
                 currentY += rowHeight;
             }
@@ -730,6 +724,30 @@
         ctx.font = 'bold 20px "Noto Sans JP", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(`現在レート: ${overallRating.toFixed(2)}`, xOverall, currentY + 20);
+
+        const statsBoxWidth = isVertical ? Math.min(width - 52, 760) : Math.min(width - 52, 960);
+        const statsBoxHeight = 132;
+        const statsLineHeight = 28;
+        const statsX = 26;
+        const statsY = height - statsBoxHeight - 24;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+        ctx.fillRect(statsX, statsY, statsBoxWidth, statsBoxHeight);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(statsX, statsY, statsBoxWidth, statsBoxHeight);
+
+        ctx.fillStyle = '#D8E9FF';
+        ctx.font = 'bold 22px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText('統計', statsX + 14, statsY + 8);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '18px "Noto Sans JP", sans-serif';
+        ctx.fillText(`BEST平均RATING: ${bestStats.avg.toFixed(4)} / 標準偏差: ${bestStats.std.toFixed(4)}`, statsX + 14, statsY + 38);
+        ctx.fillText(`新曲平均RATING: ${recentStats.avg.toFixed(4)} / 標準偏差: ${recentStats.std.toFixed(4)}`, statsX + 14, statsY + 38 + statsLineHeight);
+        ctx.fillText(`全体標準偏差(現在レート込): ${allStats.std.toFixed(4)}  |  現在レート: ${overallRating.toFixed(4)}`, statsX + 14, statsY + 38 + (statsLineHeight * 2));
 
         // Display image logic
         const dataUrl = canvas.toDataURL('image/png');
