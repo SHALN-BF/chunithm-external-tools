@@ -612,7 +612,7 @@
                 ctx.textBaseline = 'middle';
 
                 const labelMaxWidth = marginLeft - 30;
-                const labelText = `${i + 1}. ${song.title}`;
+                const labelText = `${i + 1}. [定数 ${songConst.toFixed(1)}] ${song.title}`;
                 const displayTitle = truncateTextToWidth(labelText, labelMaxWidth);
                 ctx.fillText(displayTitle, 20, currentY + 15);
 
@@ -650,19 +650,21 @@
                 ctx.fillStyle = colorSet.dark;
                 ctx.fillRect(xBase, barY, xRating - xBase, barHeight);
 
-                // Hypothetical SSS+ stripe (rainbow, centered, 3/7 bar thickness)
-                const rainbowHeight = barHeight * (3 / 7);
-                const rainbowY = barY + ((barHeight - rainbowHeight) / 2);
-                const rainbowGradient = ctx.createLinearGradient(xBase, 0, xSSSPlus, 0);
-                rainbowGradient.addColorStop(0.00, 'rgba(255, 64, 64, 0.95)');
-                rainbowGradient.addColorStop(0.17, 'rgba(255, 160, 64, 0.95)');
-                rainbowGradient.addColorStop(0.34, 'rgba(255, 235, 64, 0.95)');
-                rainbowGradient.addColorStop(0.51, 'rgba(64, 220, 96, 0.95)');
-                rainbowGradient.addColorStop(0.68, 'rgba(64, 170, 255, 0.95)');
-                rainbowGradient.addColorStop(0.85, 'rgba(120, 120, 255, 0.95)');
-                rainbowGradient.addColorStop(1.00, 'rgba(190, 90, 255, 0.95)');
-                ctx.fillStyle = rainbowGradient;
-                ctx.fillRect(xBase, rainbowY, Math.max(0, xSSSPlus - xBase), rainbowHeight);
+                // Rainbow stripe only for songs that already reached theoretical SSS+
+                if (isAtTheoretical) {
+                    const rainbowHeight = barHeight * (3 / 7);
+                    const rainbowY = barY + ((barHeight - rainbowHeight) / 2);
+                    const rainbowGradient = ctx.createLinearGradient(xBase, 0, xSSSPlus, 0);
+                    rainbowGradient.addColorStop(0.00, 'rgba(255, 64, 64, 0.95)');
+                    rainbowGradient.addColorStop(0.17, 'rgba(255, 160, 64, 0.95)');
+                    rainbowGradient.addColorStop(0.34, 'rgba(255, 235, 64, 0.95)');
+                    rainbowGradient.addColorStop(0.51, 'rgba(64, 220, 96, 0.95)');
+                    rainbowGradient.addColorStop(0.68, 'rgba(64, 170, 255, 0.95)');
+                    rainbowGradient.addColorStop(0.85, 'rgba(120, 120, 255, 0.95)');
+                    rainbowGradient.addColorStop(1.00, 'rgba(190, 90, 255, 0.95)');
+                    ctx.fillStyle = rainbowGradient;
+                    ctx.fillRect(xBase, rainbowY, Math.max(0, xSSSPlus - xBase), rainbowHeight);
+                }
 
                 // Highlight constant anchors (top-most, thicker)
                 ctx.strokeStyle = 'rgba(120, 200, 255, 0.95)';
