@@ -6,7 +6,17 @@ from taka-4602/chunithm-best-generator
 ```js
 javascript:(function(){
     const script = document.createElement('script');
-    script.src = "https://taka-4602.github.io/chunithm-best-generator/main.js?" + new Date().getTime();
+    script.src = "https://shaln-bf.github.io/chunithm-external-tools/main.js?" + new Date().getTime();
+    document.body.appendChild(script);
+})();
+```
+
+## グラフ機能
+以下をブックマークに登録すると、各楽曲のSSS+時のレートと現在のレートを比較するグラフを生成できます。
+```js
+javascript:(function(){
+    const script = document.createElement('script');
+    script.src = "https://shaln-bf.github.io/chunithm-external-tools/graph.js?" + new Date().getTime();
     document.body.appendChild(script);
 })();
 ```
