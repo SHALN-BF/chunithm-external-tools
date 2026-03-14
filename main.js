@@ -4,7 +4,7 @@
 
     const GITHUB_USER = "SHALN-BF";
     const GITHUB_REPO = "chunithm-external-tools";
-    const CONST_DATA_URL = "https://reiwa.f5.si/chunithm_record.json";
+    const CONST_DATA_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/chunithm.json`;
 
     const BASE_URL = "https://new.chunithm-net.com/chuni-mobile/html/mobile/";
     const URL_PLAYER_DATA = BASE_URL + "home/playerData/";
@@ -310,7 +310,10 @@
         for (const form of songForms) {
             const difficultyClass = form.querySelector('div[class*="bg_"]').className;
             let difficulty = "UNKNOWN";
-            if (difficultyClass.includes("master")) difficulty = "MASTER";
+
+            if (difficultyClass.includes("basic")) difficulty = "BASIC";
+            else if (difficultyClass.includes("advanced")) difficulty = "ADVANCED";
+            else if (difficultyClass.includes("master")) difficulty = "MASTER";
             else if (difficultyClass.includes("expert")) difficulty = "EXPERT";
             else if (difficultyClass.includes("ultima")) difficulty = "ULTIMA";
 
@@ -683,9 +686,16 @@
                 const x = startX + col * (blockWidth + PADDING);
                 const y = startY + 70 + row * (BLOCK_HEIGHT + PADDING);
 
+                const difficultyInfo = {
+                    ULTIMA: { bg: 'linear-gradient(135deg, #a00, #310000)' },
+                    MASTER: { bg: '#8A2BE2' }, EXPERT: { bg: '#ff1100ff' },
+                    ADVANCED: { bg: '#FDD835' }, BASIC: { bg: '#7CB342' },
+                    UNKNOWN: { bg: '#9E9E9E' }
+                };
+                const diffStyle = difficultyInfo[song.difficulty] || difficultyInfo.UNKNOWN;
                 // カード背景
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.strokeStyle = diffStyle.bg;
                 ctx.lineWidth = 1;
                 ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
                 ctx.shadowBlur = 15;
@@ -726,13 +736,7 @@
                 const ribbonWidth = textWidth + 20;
                 const ribbonX = jacket_x + JACKET_SIZE - ribbonWidth - 5;
                 const ribbonY = jacket_y + 5;
-                const difficultyInfo = {
-                    ULTIMA: { bg: 'linear-gradient(135deg, #a00, #310000)' },
-                    MASTER: { bg: '#8A2BE2' }, EXPERT: { bg: '#ff1100ff' },
-                    ADVANCED: { bg: '#FDD835' }, BASIC: { bg: '#7CB342' },
-                    UNKNOWN: { bg: '#9E9E9E' }
-                };
-                const diffStyle = difficultyInfo[song.difficulty] || difficultyInfo.UNKNOWN;
+
                 ctx.save();
                 if (song.difficulty === 'ULTIMA') {
                     const grad = ctx.createLinearGradient(ribbonX, ribbonY, ribbonX + ribbonWidth, ribbonY);
