@@ -669,7 +669,7 @@
                 ctx.lineTo(xConstPlusOne, barY + barHeight + 5);
                 ctx.stroke();
 
-                const stripeHeight = barHeight * (3 / 7);
+                const stripeHeight = barHeight * (4 / 7);
                 const stripeY = barY + ((barHeight - stripeHeight) / 2);
                 const stripeEndX = Math.max(xBase, Math.min(xRating, xSSSPlus));
                 const stripeWidth = Math.max(0, stripeEndX - xBase);
