@@ -715,24 +715,51 @@
                 ctx.font = '16px Arial';
                 ctx.textBaseline = 'middle';
 
+                const currentLabelText = `${song.rating.toFixed(2)}`;
+                const maxLabelText = `${sssPlus.toFixed(2)}`;
+                const baseLabelY = currentY + 15;
+                let currentLabelY = baseLabelY;
+                let maxLabelY = baseLabelY;
+
+                const currentLabelW = ctx.measureText(currentLabelText).width;
+                const maxLabelW = ctx.measureText(maxLabelText).width;
+
                 // Current rating label: left side of current marker
-                if (!isAtTheoretical) {
-                    ctx.textAlign = 'right';
-                    const currentLabelX = Math.max(xBase + 48, xRating - 8);
-                    ctx.fillText(`${song.rating.toFixed(2)}`, currentLabelX, currentY + 15);
-                }
+                let currentLabelX = Math.max(xBase + 48, xRating - 8);
 
                 // Max(theoretical SSS+) label: right side of theoretical marker
-                const maxLabelText = `${sssPlus.toFixed(2)}`;
                 const maxLabelNaturalX = xSSSPlus + 8;
-                const maxLabelW = ctx.measureText(maxLabelText).width;
                 const maxLabelLimitX = width - 12;
-                if (maxLabelNaturalX + maxLabelW <= maxLabelLimitX) {
+                let maxLabelAlign = 'left';
+                let maxLabelX = maxLabelNaturalX;
+                if (maxLabelNaturalX + maxLabelW > maxLabelLimitX) {
+                    maxLabelAlign = 'right';
+                    maxLabelX = maxLabelLimitX;
+                }
+
+                const currentLeft = currentLabelX - currentLabelW;
+                const currentRight = currentLabelX;
+                const maxLeft = maxLabelAlign === 'left' ? maxLabelX : (maxLabelX - maxLabelW);
+                const maxRight = maxLabelAlign === 'left' ? (maxLabelX + maxLabelW) : maxLabelX;
+                const labelsOverlap = !(currentRight < maxLeft || maxRight < currentLeft);
+
+                if (!isAtTheoretical && labelsOverlap) {
+                    // When labels are crowded, separate them vertically to avoid overlap.
+                    currentLabelY = baseLabelY - 9;
+                    maxLabelY = baseLabelY + 9;
+                }
+
+                if (!isAtTheoretical) {
+                    ctx.textAlign = 'right';
+                    ctx.fillText(currentLabelText, currentLabelX, currentLabelY);
+                }
+
+                if (maxLabelAlign === 'left') {
                     ctx.textAlign = 'left';
-                    ctx.fillText(maxLabelText, maxLabelNaturalX, currentY + 15);
+                    ctx.fillText(maxLabelText, maxLabelX, maxLabelY);
                 } else {
                     ctx.textAlign = 'right';
-                    ctx.fillText(maxLabelText, maxLabelLimitX, currentY + 15);
+                    ctx.fillText(maxLabelText, maxLabelX, maxLabelY);
                 }
 
                 currentY += rowHeight;
