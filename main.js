@@ -16,6 +16,9 @@
     const URL_RANKING_MASTER = BASE_URL + "ranking/master/";
     const URL_RANKING_DETAIL_SEND = BASE_URL + "ranking/sendRankingDetail/";
     const URL_RANKING_DETAIL = BASE_URL + "ranking/musicRankingDetail/";
+    const URL_RANKING_BASIC_SEND = URL_RANKING_DETAIL + "sendRankingBasic/";
+    const URL_RANKING_ADVANCED_SEND = URL_RANKING_DETAIL + "sendRankingAdvanced/";
+    const URL_RANKING_MASTER_DETAIL_SEND = URL_RANKING_DETAIL + "sendRankingMaster/";
     const URL_RANKING_ULTIMA_SEND = URL_RANKING_DETAIL + "sendRankingUltima/";
     const URL_RANKING_EXPERT_SEND = URL_RANKING_DETAIL + "sendRankingExpert/";
 
@@ -545,7 +548,7 @@
         updateMessage('定数データと照合中...', 18);
         let filteredNewSongs = [];
         let filteredOldSongs = [];
-        const diffMap = { MAS: '3', EXP: '2', ULT: '4' };
+        const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
         const currentVersionName = getCurrentVersionName(constData);
 
         for (const songData of constData) {
@@ -561,7 +564,7 @@
             const songObject = {
                 title: songData.title,
                 artist: songData.artist,
-                difficulty: { MAS: 'MASTER', EXP: 'EXPERT', ULT: 'ULTIMA' }[songData.diff],
+                difficulty: { BAS: 'BASIC', ADV: 'ADVANCED', MAS: 'MASTER', EXP: 'EXPERT', ULT: 'ULTIMA' }[songData.diff],
                 const: Number(songData.const),
                 jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/images/jacket/${songData.img}.jpg` : '',
                 playCount: 'N/A',
@@ -597,16 +600,21 @@
                     updateMessage(`${type}取得中: ${song.title} [${song.difficulty}] (${i + 1}/${total})`, progress);
                     await fetch(URL_RANKING_DETAIL_SEND, { method: 'POST', body: new URLSearchParams(song.params) });
 
-                    let scoreDoc;
-                    if (song.difficulty === 'ULTIMA') {
-                        await fetch(URL_RANKING_ULTIMA_SEND, { method: 'POST', body: new URLSearchParams({ ...song.params, category: '1', region: '1' }) });
-                        scoreDoc = await fetchDocument(URL_RANKING_DETAIL);
-                    } else if (song.difficulty === 'EXPERT') {
-                        await fetch(URL_RANKING_EXPERT_SEND, { method: 'POST', body: new URLSearchParams({ ...song.params, category: '1', region: '1' }) });
-                        scoreDoc = await fetchDocument(URL_RANKING_DETAIL);
-                    } else {
-                        scoreDoc = await fetchDocument(URL_RANKING_DETAIL);
+                    const rankingDetailSendByDifficulty = {
+                        BASIC: URL_RANKING_BASIC_SEND,
+                        ADVANCED: URL_RANKING_ADVANCED_SEND,
+                        EXPERT: URL_RANKING_EXPERT_SEND,
+                        MASTER: URL_RANKING_MASTER_DETAIL_SEND,
+                        ULTIMA: URL_RANKING_ULTIMA_SEND,
+                    };
+                    const difficultyDetailUrl = rankingDetailSendByDifficulty[song.difficulty];
+                    if (difficultyDetailUrl) {
+                        await fetch(difficultyDetailUrl, {
+                            method: 'POST',
+                            body: new URLSearchParams({ ...song.params, category: '1', region: '1' })
+                        });
                     }
+                    const scoreDoc = await fetchDocument(URL_RANKING_DETAIL);
 
                     const scoreElement = scoreDoc.querySelector('.rank_playdata_highscore .text_b');
                     const jacketElement = scoreDoc.querySelector('.play_jacket_img img');
@@ -1105,101 +1113,392 @@
         ctx.fillText('CHUNITHM-EXTERNAL-TOOLS', footerX, firstLineY);
         ctx.fillText('Dev.: SHALN-BF (Fuyant, Aut.)', footerX, secondLineY);
 
-        // --- 結果表示 ---
-        updateMessage("画像を生成中...");
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        const currentOverlay = document.querySelector('div[style*="z-index: 9999"]');
-        if (currentOverlay) {
-            currentOverlay.innerHTML = '';
-            currentOverlay.style.alignItems = 'center';
-            currentOverlay.style.overflowY = 'auto';
+        return canvas.toDataURL('image/jpeg', 0.9);
+    };
 
-            const resultContainer = document.createElement('div');
-            resultContainer.style.cssText = `
-                background-color: rgba(30, 30, 45, 0.9);
-                border-radius: 15px;
-                padding: 25px;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 20px;
-            `;
+    const generateGraphImage = async (playerData, bestList, recentList, mode) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
 
-            const title = document.createElement('h2');
-            title.textContent = '生成完了！';
-            title.style.cssText = 'font-size: 24px; font-weight: bold; color: #E0E0E0; margin: 0;';
+        const isVertical = mode === 'vertical';
+        const rowHeight = isVertical ? 50 : 45;
+        const baseTitleAreaWidth = isVertical ? 280 : 350;
+        const baseGraphAreaWidth = isVertical ? 590 : 1000;
+        const marginLeft = Math.round(baseTitleAreaWidth * 1.2);
+        const graphWidth = Math.round(baseGraphAreaWidth * 1.2);
+        const marginRight = 50;
+        const width = marginLeft + graphWidth + marginRight;
+        const statsPanelHeight = 170;
+        const height = (isVertical ? 200 : 170) + (bestList.length * rowHeight) + 100 + (recentList.length * rowHeight) + 110 + statsPanelHeight;
+        canvas.width = width;
+        canvas.height = height;
 
-            const resultImage = document.createElement('img');
-            resultImage.src = dataUrl;
-            resultImage.style.cssText = `
-                max-width: 90vw;
-                max-height: 75vh;
-                object-fit: contain;
-                border-radius: 10px;
-                box-shadow: 0 5px 20px rgba(0,0,0,0.4);
-                cursor: zoom-in;
-                transition: all 0.2s ease-in-out;
-            `;
+        ctx.fillStyle = "#1e1e1e";
+        ctx.fillRect(0, 0, width, height);
 
-            let isScaled = true;
-            resultImage.onclick = () => {
-                if (isScaled) {
-                    resultImage.style.maxWidth = 'none';
-                    resultImage.style.maxHeight = 'none';
-                    resultImage.style.cursor = 'zoom-out';
+        const overallRating = Number(playerData.rating);
+        const allSongs = [...bestList, ...recentList];
+        const ratingPoints = [overallRating];
+        allSongs.forEach(song => {
+            ratingPoints.push(Number(song.rating));
+            ratingPoints.push(Number(song.const || 0) + 2.15);
+        });
+
+        let minRating = Math.min(...ratingPoints);
+        let maxRating = Math.max(...ratingPoints);
+        let ratingRange = maxRating - minRating;
+
+        if (!Number.isFinite(minRating) || !Number.isFinite(maxRating)) {
+            minRating = 0;
+            maxRating = 1;
+            ratingRange = 1;
+        } else if (ratingRange === 0) {
+            minRating -= 0.5;
+            maxRating += 0.5;
+            ratingRange = 1;
+        } else {
+            const axisMargin = Math.max(0.02, ratingRange * 0.015);
+            minRating -= axisMargin;
+            maxRating += axisMargin;
+            ratingRange = maxRating - minRating;
+        }
+
+        const calcRatingStats = (ratings) => {
+            const values = ratings.filter(v => Number.isFinite(v));
+            if (values.length === 0) {
+                return { avg: 0, std: 0 };
+            }
+            const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+            const variance = values.reduce((sum, v) => sum + ((v - avg) ** 2), 0) / values.length;
+            return { avg, std: Math.sqrt(variance) };
+        };
+
+        const bestRatings = bestList.map(song => Number(song.rating));
+        const recentRatings = recentList.map(song => Number(song.rating));
+        const allRatings = [...bestRatings, ...recentRatings, overallRating];
+
+        const bestStats = calcRatingStats(bestRatings);
+        const recentStats = calcRatingStats(recentRatings);
+        const allStats = calcRatingStats(allRatings);
+        const bestMinRating = bestRatings.length > 0 ? Math.min(...bestRatings) : 0;
+        const recentMinRating = recentRatings.length > 0 ? Math.min(...recentRatings) : 0;
+        const bestConstLowerBound = bestMinRating - 2.15;
+        const recentConstLowerBound = recentMinRating - 2.15;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = 'bold 38px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText('CHUNITHM BEST/RECENT GRAPH', 50, 34);
+        ctx.font = 'bold 30px "Noto Sans JP", sans-serif';
+        ctx.fillText(`${playerData.name}`, 50, 82);
+        ctx.fillText(`Rating: ${playerData.rating}`, 50, 122);
+
+        const plotX = (val) => {
+            const normalized = (val - minRating) / (maxRating - minRating);
+            return marginLeft + Math.max(0, Math.min(1, normalized)) * graphWidth;
+        };
+
+        const truncateTextToWidth = (text, maxWidth) => {
+            if (ctx.measureText(text).width <= maxWidth) return text;
+            let clipped = text;
+            while (clipped.length > 0 && ctx.measureText(clipped + '...').width > maxWidth) {
+                clipped = clipped.slice(0, -1);
+            }
+            return clipped + '...';
+        };
+
+        ctx.font = '20px Arial';
+        ctx.fillStyle = "#888888";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const tickStep = ratingRange <= 4 ? 0.25 : (ratingRange <= 8 ? 0.5 : 1.0);
+        const tickDecimals = tickStep < 1 ? 2 : 1;
+        const tickStart = Math.ceil(minRating / tickStep) * tickStep;
+        for (let r = tickStart; r <= maxRating + 1e-9; r += tickStep) {
+            const x = plotX(r);
+            ctx.beginPath();
+            ctx.moveTo(x, 120);
+            ctx.lineTo(x, height - 50);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillText(r.toFixed(tickDecimals), x, 140);
+        }
+
+        let currentY = isVertical ? 220 : 200;
+
+        const drawSection = (title, list) => {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = 'bold 30px "Noto Sans JP", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(title, 50, currentY);
+            currentY += 50;
+
+            for (let i = 0; i < list.length; i++) {
+                const song = list[i];
+                const songConst = song.const || 0;
+                const sssPlus = (song.const || 0) + 2.15;
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = '22px "Noto Sans JP", sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+
+                const labelMaxWidth = marginLeft - 30;
+                const labelText = `${songConst.toFixed(2)} | ${song.title}`;
+                const displayTitle = truncateTextToWidth(labelText, labelMaxWidth);
+                ctx.fillText(displayTitle, 20, currentY + 15);
+
+                const xBase = marginLeft;
+                const xConst = plotX(songConst);
+                const xConstPlusOne = plotX(songConst + 1);
+                const xSSSPlus = plotX(sssPlus);
+                const xRating = plotX(song.rating);
+                const isAtTheoretical = song.rating >= (sssPlus - 1e-6);
+
+                const diffColors = {
+                    'MAS': { light: 'rgba(156, 39, 176, 0.4)', dark: 'rgba(156, 39, 176, 1)' },
+                    'EXP': { light: 'rgba(244, 67, 54, 0.4)', dark: 'rgba(244, 67, 54, 1)' },
+                    'ULT': { light: 'rgba(120, 18, 18, 0.45)', dark: 'rgba(245, 82, 82, 1)' },
+                    'ADV': { light: 'rgba(255, 152, 0, 0.4)', dark: 'rgba(255, 152, 0, 1)' },
+                    'BAS': { light: 'rgba(76, 175, 80, 0.4)', dark: 'rgba(76, 175, 80, 1)' }
+                };
+                const diffAbbr = song.difficulty === 'MASTER' ? 'MAS' :
+                    song.difficulty === 'EXPERT' ? 'EXP' :
+                        song.difficulty === 'ULTIMA' ? 'ULT' :
+                            song.difficulty === 'ADVANCED' ? 'ADV' : 'BAS';
+
+                const colorSet = diffColors[diffAbbr] || { light: 'rgba(100,100,100,0.5)', dark: 'rgba(200,200,200,1)' };
+
+                const barHeight = isVertical ? 30 : 26;
+                const barY = currentY + 15 - barHeight / 2;
+
+                ctx.fillStyle = colorSet.light;
+                ctx.fillRect(xBase, barY, xSSSPlus - xBase, barHeight);
+
+                ctx.fillStyle = colorSet.dark;
+                ctx.fillRect(xBase, barY, xRating - xBase, barHeight);
+
+                ctx.strokeStyle = 'rgba(120, 200, 255, 0.95)';
+                ctx.lineWidth = 3.6;
+                ctx.beginPath();
+                ctx.moveTo(xConst, barY - 5);
+                ctx.lineTo(xConst, barY + barHeight + 5);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255, 220, 120, 0.95)';
+                ctx.lineWidth = 3.6;
+                ctx.beginPath();
+                ctx.moveTo(xConstPlusOne, barY - 5);
+                ctx.lineTo(xConstPlusOne, barY + barHeight + 5);
+                ctx.stroke();
+
+                const stripeHeight = barHeight * (5 / 7);
+                const stripeY = barY + ((barHeight - stripeHeight) / 2);
+                const stripeEndX = Math.max(xBase, Math.min(xRating, xSSSPlus));
+                const stripeWidth = Math.max(0, stripeEndX - xBase);
+
+                if (isAtTheoretical) {
+                    const rainbowGradient = ctx.createLinearGradient(xBase, 0, xSSSPlus, 0);
+                    rainbowGradient.addColorStop(0.00, 'rgba(255, 64, 64, 0.95)');
+                    rainbowGradient.addColorStop(0.17, 'rgba(255, 160, 64, 0.95)');
+                    rainbowGradient.addColorStop(0.34, 'rgba(255, 235, 64, 0.95)');
+                    rainbowGradient.addColorStop(0.51, 'rgba(64, 220, 96, 0.95)');
+                    rainbowGradient.addColorStop(0.68, 'rgba(64, 170, 255, 0.95)');
+                    rainbowGradient.addColorStop(0.85, 'rgba(120, 120, 255, 0.95)');
+                    rainbowGradient.addColorStop(1.00, 'rgba(190, 90, 255, 0.95)');
+                    ctx.fillStyle = rainbowGradient;
                 } else {
-                    resultImage.style.maxWidth = '90vw';
-                    resultImage.style.maxHeight = '75vh';
-                    resultImage.style.cursor = 'zoom-in';
+                    ctx.fillStyle = colorSet.dark;
                 }
-                isScaled = !isScaled;
-            };
+                ctx.fillRect(xBase, stripeY, stripeWidth, stripeHeight);
 
-            const buttonContainer = document.createElement('div');
-            buttonContainer.style.cssText = 'display: flex; gap: 15px;';
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+                ctx.lineWidth = 3.2;
+                ctx.beginPath();
+                ctx.moveTo(xRating, barY - 5);
+                ctx.lineTo(xRating, barY + barHeight + 5);
+                ctx.stroke();
 
-            const createActionButton = (text, bgColor) => {
-                const button = document.createElement('button');
-                button.textContent = text;
-                button.style.cssText = `
-                    padding: 12px 25px;
-                    font-size: 16px;
-                    font-weight: bold;
-                    cursor: pointer;
-                    background-color: ${bgColor};
-                    color: white;
-                    border: none;
-                    border-radius: 8px;
-                    transition: transform 0.1s, opacity 0.2s;
-                `;
-                button.onmouseover = () => button.style.opacity = '0.85';
-                button.onmouseout = () => button.style.opacity = '1';
-                button.onmousedown = () => button.style.transform = 'scale(0.97)';
-                button.onmouseup = () => button.style.transform = 'scale(1)';
-                return button;
-            };
+                ctx.fillStyle = "#ffffff";
+                ctx.font = '16px Arial';
+                ctx.textBaseline = 'middle';
 
-            const saveButton = createActionButton('画像を保存', '#4CAF50');
+                const currentLabelText = `${song.rating.toFixed(2)}`;
+                const maxLabelText = `${sssPlus.toFixed(2)}`;
+                const baseLabelY = currentY + 15;
+                const maxLabelW = ctx.measureText(maxLabelText).width;
+
+                const currentLabelX = Math.max(xBase + 48, xRating - 8);
+                const maxLabelNaturalX = xSSSPlus + 8;
+                const maxLabelLimitX = width - 12;
+                let maxLabelAlign = 'left';
+                let maxLabelX = maxLabelNaturalX;
+                if (maxLabelNaturalX + maxLabelW > maxLabelLimitX) {
+                    maxLabelAlign = 'right';
+                    maxLabelX = maxLabelLimitX;
+                }
+
+                if (!isAtTheoretical) {
+                    ctx.textAlign = 'right';
+                    ctx.fillText(currentLabelText, currentLabelX, baseLabelY);
+                }
+
+                if (maxLabelAlign === 'left') {
+                    ctx.textAlign = 'left';
+                    ctx.fillText(maxLabelText, maxLabelX, baseLabelY);
+                } else {
+                    ctx.textAlign = 'right';
+                    ctx.fillText(maxLabelText, maxLabelX, baseLabelY);
+                }
+
+                currentY += rowHeight;
+            }
+        };
+
+        drawSection("BEST枠", bestList);
+        currentY += 40;
+        drawSection("新曲枠", recentList);
+
+        const xOverall = plotX(overallRating);
+        ctx.beginPath();
+        ctx.moveTo(xOverall, 150);
+        ctx.lineTo(xOverall, currentY);
+        ctx.strokeStyle = "#FFFF00";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = "#FFFF00";
+        ctx.font = 'bold 20px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`現在レート: ${overallRating.toFixed(2)}`, xOverall, currentY + 20);
+
+        const statsBoxWidth = isVertical ? Math.min(width - 52, 760) : Math.min(width - 52, 960);
+        const statsBoxHeight = 160;
+        const statsLineHeight = 28;
+        const statsX = 26;
+        const statsY = height - statsBoxHeight - 24;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+        ctx.fillRect(statsX, statsY, statsBoxWidth, statsBoxHeight);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(statsX, statsY, statsBoxWidth, statsBoxHeight);
+
+        ctx.fillStyle = '#D8E9FF';
+        ctx.font = 'bold 22px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText('統計', statsX + 14, statsY + 8);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '18px "Noto Sans JP", sans-serif';
+        ctx.fillText(`BEST平均RATING: ${bestStats.avg.toFixed(4)} / 標準偏差: ${bestStats.std.toFixed(4)}`, statsX + 14, statsY + 38);
+        ctx.fillText(`新曲平均RATING: ${recentStats.avg.toFixed(4)} / 標準偏差: ${recentStats.std.toFixed(4)}`, statsX + 14, statsY + 38 + statsLineHeight);
+        ctx.fillText(`全体標準偏差(現在レート込): ${allStats.std.toFixed(4)}  |  現在レート: ${overallRating.toFixed(4)}`, statsX + 14, statsY + 38 + (statsLineHeight * 2));
+        ctx.fillText(`更新関与の定数下限(BEST/新曲): ${bestConstLowerBound.toFixed(4)} / ${recentConstLowerBound.toFixed(4)}`, statsX + 14, statsY + 38 + (statsLineHeight * 3));
+
+        return canvas.toDataURL('image/png');
+    };
+
+    const showGeneratedImages = (listDataUrl, graphDataUrl) => {
+        const currentOverlay = document.querySelector('div[style*="z-index: 9999"]');
+        if (!currentOverlay) return;
+
+        currentOverlay.innerHTML = '';
+        currentOverlay.style.alignItems = 'center';
+        currentOverlay.style.overflowY = 'auto';
+
+        const resultContainer = document.createElement('div');
+        resultContainer.style.cssText = `
+            background-color: rgba(30, 30, 45, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: min(95vw, 1300px);
+        `;
+
+        const title = document.createElement('h2');
+        title.textContent = '生成完了！';
+        title.style.cssText = 'font-size: 24px; font-weight: bold; color: #E0E0E0; margin: 0;';
+
+        const imagesWrapper = document.createElement('div');
+        imagesWrapper.style.cssText = 'display: grid; grid-template-columns: 1fr; gap: 18px; width: 100%;';
+
+        const createImageCard = (cardTitle, dataUrl, filenamePrefix) => {
+            const card = document.createElement('div');
+            card.style.cssText = 'background: rgba(0, 0, 0, 0.25); border-radius: 12px; padding: 14px;';
+
+            const heading = document.createElement('h3');
+            heading.textContent = cardTitle;
+            heading.style.cssText = 'margin: 0 0 10px 0; color: #fff; font-size: 18px;';
+
+            const imageArea = document.createElement('div');
+            imageArea.style.cssText = 'max-height: 42vh; overflow: auto; border-radius: 10px;';
+
+            const image = document.createElement('img');
+            image.src = dataUrl;
+            image.style.cssText = 'max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px;';
+            imageArea.appendChild(image);
+
+            const saveButton = document.createElement('button');
+            saveButton.textContent = `${cardTitle}を保存`;
+            saveButton.style.cssText = `
+                margin-top: 10px;
+                padding: 10px 16px;
+                font-size: 14px;
+                font-weight: bold;
+                cursor: pointer;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 8px;
+            `;
             saveButton.onclick = () => {
                 const a = document.createElement('a');
                 a.href = dataUrl;
-                a.download = `chunithm-rating-${Date.now()}.png`;
+                a.download = `${filenamePrefix}-${Date.now()}.png`;
                 a.click();
             };
 
-            const closeButton = createActionButton('閉じる', '#f44336');
-            closeButton.onclick = () => document.body.removeChild(currentOverlay);
+            card.appendChild(heading);
+            card.appendChild(imageArea);
+            card.appendChild(saveButton);
+            return card;
+        };
 
-            buttonContainer.appendChild(saveButton);
-            buttonContainer.appendChild(closeButton);
-            resultContainer.appendChild(title);
-            resultContainer.appendChild(resultImage);
-            resultContainer.appendChild(buttonContainer);
-            currentOverlay.appendChild(resultContainer);
-            currentOverlay.appendChild(globalCloseButton); // Re-append global close button
-        }
+        imagesWrapper.appendChild(createImageCard('リスト画像', listDataUrl, 'chunithm-rating'));
+        imagesWrapper.appendChild(createImageCard('グラフ画像', graphDataUrl, 'chunithm-graph'));
+
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '閉じる';
+        closeButton.style.cssText = `
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 8px;
+        `;
+        closeButton.onclick = () => document.body.removeChild(currentOverlay);
+
+        resultContainer.appendChild(title);
+        resultContainer.appendChild(imagesWrapper);
+        resultContainer.appendChild(closeButton);
+        currentOverlay.appendChild(resultContainer);
+        currentOverlay.appendChild(globalCloseButton);
     };
 
     // --- メイン処理 ---
@@ -1318,7 +1617,15 @@
             finalRecentList = detailedSongs.slice(bestList.length);
         }
 
-        await generateImage(playerData, finalBestList, finalRecentList, mode);
+        updateMessage('リスト画像を生成中...', 97);
+        const listDataUrl = await generateImage(playerData, finalBestList, finalRecentList, mode);
+        if (isAborted) return;
+
+        updateMessage('グラフ画像を生成中...', 99);
+        const graphDataUrl = await generateGraphImage(playerData, finalBestList, finalRecentList, mode);
+        if (isAborted) return;
+
+        showGeneratedImages(listDataUrl, graphDataUrl);
 
     } catch (error) {
         if (isAborted) {
