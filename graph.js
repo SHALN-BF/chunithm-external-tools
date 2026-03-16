@@ -480,13 +480,36 @@
     };
 
     const getCurrentVersionName = (constData) => {
-        const versionCount = new Map();
-        constData.forEach(entry => {
-            if (!entry || typeof entry.version !== 'string') return;
-            versionCount.set(entry.version, (versionCount.get(entry.version) || 0) + 1);
-        });
-        if (versionCount.size === 0) return CURRENT_VERSION;
-        return [...versionCount.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        const versions = constData
+            .map(entry => (entry && typeof entry.version === 'string') ? entry.version.trim() : '')
+            .filter(Boolean);
+
+        if (versions.length === 0) return CURRENT_VERSION;
+
+        const available = new Set(versions);
+        if (available.has(CURRENT_VERSION)) {
+            return CURRENT_VERSION;
+        }
+
+        const knownOrder = [
+            'AIR', 'AIR PLUS',
+            'STAR', 'STAR PLUS',
+            'AMAZON', 'AMAZON PLUS',
+            'CRYSTAL', 'CRYSTAL PLUS',
+            'PARADISE', 'PARADISE LOST',
+            'NEW', 'NEW PLUS',
+            'SUN', 'SUN PLUS',
+            'LUMINOUS', 'LUMINOUS PLUS',
+            'VERSE', 'X-VERSE', 'X-VERSE-X'
+        ];
+
+        for (let i = knownOrder.length - 1; i >= 0; i--) {
+            if (available.has(knownOrder[i])) {
+                return knownOrder[i];
+            }
+        }
+
+        return versions[versions.length - 1];
     };
 
     const fetchAllSongsForFreeUser = async (bestConstThreshold, newConstThreshold, delay, constData) => {
