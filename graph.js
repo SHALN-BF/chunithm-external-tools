@@ -1,6 +1,6 @@
 (async function () {
     'use strict';
-    const CURRENT_VERSION = "X-VERSE";
+    const CURRENT_VERSION = "X-VERSE-X";
 
     const GITHUB_USER = "SHALN-BF";
     const GITHUB_REPO = "chunithm-external-tools";
@@ -873,7 +873,7 @@
                 const diffColors = {
                     'MAS': { light: 'rgba(156, 39, 176, 0.4)', dark: 'rgba(156, 39, 176, 1)' },
                     'EXP': { light: 'rgba(244, 67, 54, 0.4)', dark: 'rgba(244, 67, 54, 1)' },
-                    'ULT': { light: 'rgba(0, 0, 0, 0.4)', dark: 'rgba(200, 200, 200, 1)' },
+                    'ULT': { light: 'rgba(120, 18, 18, 0.45)', dark: 'rgba(245, 82, 82, 1)' },
                     'ADV': { light: 'rgba(255, 152, 0, 0.4)', dark: 'rgba(255, 152, 0, 1)' },
                     'BAS': { light: 'rgba(76, 175, 80, 0.4)', dark: 'rgba(76, 175, 80, 1)' }
                 };
