@@ -1,6 +1,6 @@
 (async function () {
     'use strict';
-    const CURRENT_VERSION = "X-VERSE";
+    const CURRENT_VERSION = "X-VERSE-X";
 
     const GITHUB_USER = "SHALN-BF";
     const GITHUB_REPO = "chunithm-external-tools";
