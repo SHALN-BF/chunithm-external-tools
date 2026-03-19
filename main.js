@@ -658,6 +658,16 @@
             { sendName: 'sendUltima', sendUrl: URL_RECORD_SEND_ULTIMA, pageUrl: URL_RECORD_ULTIMA },
         ];
 
+        const parseScoreFromText = (text) => {
+            if (!text) return { scoreStr: '', scoreInt: 0 };
+            const normalized = String(text).replace(/\s+/g, '');
+            const match = normalized.match(/\d[\d,]{5,}/);
+            if (!match) return { scoreStr: '', scoreInt: 0 };
+            const scoreStr = match[0];
+            const scoreInt = parseInt(scoreStr.replace(/,/g, ''), 10) || 0;
+            return { scoreStr, scoreInt };
+        };
+
         const resolveRedirectUrl = async (sendUrl, body, fallbackUrl, flowName = '') => {
             let targetUrl = fallbackUrl;
 
@@ -726,9 +736,14 @@
 
                 if (!title || !params.idx || !params.token || !params.genre || !params.diff) return;
 
+                const scoreElement = form.querySelector('.play_musicdata_highscore .text_b, .musicdata_highscore .text_b, .musicdata_score_num .text_b, .text_b');
+                const parsedScore = parseScoreFromText(scoreElement?.innerText || '');
+
                 initialSongList.push({
                     title,
-                    params
+                    params,
+                    score_str: parsedScore.scoreStr,
+                    score_int: parsedScore.scoreInt,
                 });
             });
         }
@@ -763,6 +778,8 @@
                 const: Number(songData.const),
                 jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/images/jacket/${songData.img}.jpg` : '',
                 playCount: 'N/A',
+                score_str: initialSong.score_str || '',
+                score_int: Number.isFinite(initialSong.score_int) ? initialSong.score_int : 0,
                 isNewSong,
                 params: { ...initialSong.params, diff: diffMap[songData.diff] }
             });
@@ -785,16 +802,22 @@
 
             try {
                 updateMessage(`レコード取得中: ${song.title} [${song.difficulty}] (${i + 1}/${total})`, progress);
-                const details = await scrapeMusicDetail(song.params, { includeScore: true });
+                const shouldFetchScoreFromDetail = !Number.isFinite(song.score_int) || song.score_int <= 0;
+                const details = await scrapeMusicDetail(song.params, { includeScore: shouldFetchScoreFromDetail });
 
-                if (!Number.isFinite(details.score_int) || details.score_int <= 0) {
+                const finalScoreInt = shouldFetchScoreFromDetail ? details.score_int : song.score_int;
+                const finalScoreStr = shouldFetchScoreFromDetail ? details.score_str : song.score_str;
+
+                if (!Number.isFinite(finalScoreInt) || finalScoreInt <= 0) {
                     continue;
                 }
 
                 detailedSongs.push({
                     ...song,
                     ...details,
-                    rating: calculateRating(details.score_int, song.const)
+                    score_str: finalScoreStr,
+                    score_int: finalScoreInt,
+                    rating: calculateRating(finalScoreInt, song.const)
                 });
             } catch (e) {
                 console.warn(`レコード取得失敗: ${song.title}`, e);
