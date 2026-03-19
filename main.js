@@ -371,6 +371,9 @@
                 }
             };
 
+            frameModeButtonsContainer.appendChild(createFrameModeButton('NEW枠あり<br><small>(デフォルト)</small>', 'withNew'));
+            frameModeButtonsContainer.appendChild(createFrameModeButton('BEST枠のみ<br><small>(TOP50まで拡張)</small>', 'best50'));
+
             const includeNewSection = document.createElement('div');
             includeNewSection.style.cssText = 'margin-top: 15px; display: none;';
             const includeNewLabel = document.createElement('label');
