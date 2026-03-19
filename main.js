@@ -11,7 +11,6 @@
     const URL_RATING_BEST = URL_PLAYER_DATA + "ratingDetailBest/";
     const URL_RATING_RECENT = URL_PLAYER_DATA + "ratingDetailRecent/";
     const URL_RECORD_MUSIC_GENRE = BASE_URL + "record/musicGenre";
-    const URL_SEND_DETAIL = BASE_URL + "record/musicGenre/sendMusicDetail/";
     const URL_RECORD_SEND_BASIC = BASE_URL + "record/musicGenre/sendBasic";
     const URL_RECORD_SEND_ADVANCED = BASE_URL + "record/musicGenre/sendAdvanced";
     const URL_RECORD_SEND_EXPERT = BASE_URL + "record/musicGenre/sendExpert";
@@ -22,7 +21,6 @@
     const URL_RECORD_EXPERT = BASE_URL + "record/musicGenre/expert";
     const URL_RECORD_MASTER = BASE_URL + "record/musicGenre/master";
     const URL_RECORD_ULTIMA = BASE_URL + "record/musicGenre/ultima";
-    const URL_DETAIL = BASE_URL + "record/musicDetail/";
     const URL_RANKING_MASTER_SEND = BASE_URL + "ranking/sendMaster/";
     const URL_RANKING_MASTER = BASE_URL + "ranking/master/";
     const URL_RANKING_DETAIL_SEND = BASE_URL + "ranking/sendRankingDetail/";
@@ -472,78 +470,6 @@
         }
         return songs;
     };
-    const scrapeMusicDetail = async (params, options = {}) => {
-        const { includeScore = false } = options;
-        const formData = new URLSearchParams();
-        Object.entries(params).forEach(([key, value]) => formData.append(key, value));
-
-        await fetch(URL_SEND_DETAIL, { method: 'POST', body: formData });
-        const doc = await fetchDocument(URL_DETAIL);
-
-        const artist = doc.querySelector('.play_musicdata_artist')?.innerText || 'N/A';
-        const jacketUrl = doc.querySelector('.play_jacket_img img')?.src || '';
-
-        const parseScoreFromText = (text) => {
-            if (!text) return { scoreStr: '', scoreInt: 0 };
-            const normalized = String(text).replace(/\s+/g, '');
-            const match = normalized.match(/\d[\d,]{5,}/);
-            if (!match) return { scoreStr: '', scoreInt: 0 };
-            const scoreStr = match[0];
-            const scoreInt = parseInt(scoreStr.replace(/,/g, ''), 10) || 0;
-            return { scoreStr, scoreInt };
-        };
-
-        let playCount = 'N/A';
-        let scoreStr = '';
-        let scoreInt = 0;
-        const difficultyMap = { '0': 'basic', '1': 'advanced', '2': 'expert', '3': 'master', '4': 'ultima' };
-        const diffSelector = `.music_box.bg_${difficultyMap[params.diff]}`;
-        const difficultyBlock = doc.querySelector(diffSelector);
-
-        if (difficultyBlock) {
-            if (includeScore) {
-                const scoreElement = difficultyBlock.querySelector('.musicdata_score_num .text_b, .play_musicdata_highscore .text_b, .musicdata_highscore .text_b, .text_b');
-                const parsed = parseScoreFromText(scoreElement?.innerText || '');
-                if (parsed.scoreInt > 0) {
-                    scoreStr = parsed.scoreStr;
-                    scoreInt = parsed.scoreInt;
-                }
-            }
-
-            const dataRows = difficultyBlock.querySelectorAll('.block_underline.ptb_5');
-            for (const row of dataRows) {
-                const titleElement = row.querySelector('.musicdata_score_title');
-                const rowValue = row.querySelector('.musicdata_score_num .text_b')?.innerText?.trim() || '';
-
-                if (includeScore && titleElement && (titleElement.innerText.includes('ハイスコア') || titleElement.innerText.includes('HIGH SCORE'))) {
-                    const parsed = parseScoreFromText(rowValue);
-                    if (parsed.scoreInt > 0) {
-                        scoreStr = parsed.scoreStr;
-                        scoreInt = parsed.scoreInt;
-                    }
-                }
-
-                if (titleElement && titleElement.innerText.includes('プレイ回数')) {
-                    const countElement = row.querySelector('.musicdata_score_num .text_b');
-                    if (countElement) {
-                        playCount = countElement.innerText;
-                    }
-                    break;
-                }
-            }
-
-            if (includeScore && scoreInt <= 0) {
-                const blockPreview = difficultyBlock.innerText?.replace(/\s+/g, ' ').slice(0, 240) || '';
-                debugRecordLog('score-parse-miss', {
-                    params,
-                    scoreElementExists: !!difficultyBlock.querySelector('.musicdata_score_num .text_b, .play_musicdata_highscore .text_b, .musicdata_highscore .text_b, .text_b'),
-                    blockPreview,
-                });
-            }
-        }
-        return { artist, jacketUrl, playCount, score_str: scoreStr, score_int: scoreInt };
-    };
-
     const normalizeTitle = (title = '') => {
         return title
             .replace(/\u3000/g, ' ')
