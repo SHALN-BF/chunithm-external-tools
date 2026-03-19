@@ -228,7 +228,7 @@
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.value = value;
-                input.min = '13.0';
+                input.min = '3.0';
                 input.max = '15.4';
                 input.step = '0.1';
                 input.style.cssText = `
@@ -237,7 +237,7 @@
                 `;
                 input.onchange = () => {
                     const val = parseFloat(input.value);
-                    if (!isNaN(val) && val >= 13.0 && val <= 15.4) {
+                    if (!isNaN(val) && val >= 3.0 && val <= 15.4) {
                         callback(val);
                     } else {
                         input.value = callback(null);
@@ -802,11 +802,10 @@
 
             try {
                 updateMessage(`レコード取得中: ${song.title} [${song.difficulty}] (${i + 1}/${total})`, progress);
-                const shouldFetchScoreFromDetail = !Number.isFinite(song.score_int) || song.score_int <= 0;
-                const details = await scrapeMusicDetail(song.params, { includeScore: shouldFetchScoreFromDetail });
+                const details = await scrapeMusicDetail(song.params, { includeScore: false });
 
-                const finalScoreInt = shouldFetchScoreFromDetail ? details.score_int : song.score_int;
-                const finalScoreStr = shouldFetchScoreFromDetail ? details.score_str : song.score_str;
+                const finalScoreInt = Number.isFinite(song.score_int) ? song.score_int : 0;
+                const finalScoreStr = song.score_str || '';
 
                 if (!Number.isFinite(finalScoreInt) || finalScoreInt <= 0) {
                     continue;
