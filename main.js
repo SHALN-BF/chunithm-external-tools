@@ -1018,6 +1018,7 @@
         };
 
         // --- レイアウト定数 ---
+        const isBest50Mode = (!hasRecentFrame && bestList.length === 50);
         let WIDTH;
         const COLS = 6;
         const BLOCK_WIDTH = 210;
@@ -1028,7 +1029,7 @@
         const FONT_FAMILY = '"Noto Sans JP", sans-serif';
 
         const gridWidth = (BLOCK_WIDTH * COLS) + (PADDING * (COLS - 1));
-        WIDTH = hasRecentFrame
+        WIDTH = (hasRecentFrame || isBest50Mode)
             ? PADDING + gridWidth + CENTER_GAP + gridWidth + PADDING
             : PADDING + gridWidth + PADDING;
         const JACKET_SIZE = BLOCK_WIDTH * 0.85;
@@ -1040,7 +1041,9 @@
         };
 
         canvas.width = WIDTH;
-        const bestListHeight = calcListHeight(bestList, COLS);
+        const bestListHeight = isBest50Mode
+            ? calcListHeight(bestList.slice(0, 30), COLS)
+            : calcListHeight(bestList, COLS);
         const recentListHeight = calcListHeight(recentList, COLS);
         canvas.height = HEADER_HEIGHT + (hasRecentFrame ? Math.max(bestListHeight, recentListHeight) : bestListHeight) + PADDING;
 
@@ -1279,10 +1282,16 @@
 
         const listsStartY = HEADER_HEIGHT;
         const bestStartX = PADDING;
-        renderSongList(hasRecentFrame ? "BEST" : "BEST TOP50", songsWithImages.slice(0, bestList.length), bestStartX, listsStartY, COLS, BLOCK_WIDTH);
-        if (hasRecentFrame) {
-            const recentStartX = PADDING + gridWidth + CENTER_GAP;
-            renderSongList("NEW", songsWithImages.slice(bestList.length), recentStartX, listsStartY, COLS, BLOCK_WIDTH);
+        if (isBest50Mode) {
+            renderSongList("BEST 1-30", songsWithImages.slice(0, 30), bestStartX, listsStartY, COLS, BLOCK_WIDTH);
+            const rightStartX = PADDING + gridWidth + CENTER_GAP;
+            renderSongList("BEST 31-50", songsWithImages.slice(30), rightStartX, listsStartY, COLS, BLOCK_WIDTH);
+        } else {
+            renderSongList(hasRecentFrame ? "BEST" : "BEST TOP50", songsWithImages.slice(0, bestList.length), bestStartX, listsStartY, COLS, BLOCK_WIDTH);
+            if (hasRecentFrame) {
+                const recentStartX = PADDING + gridWidth + CENTER_GAP;
+                renderSongList("NEW", songsWithImages.slice(bestList.length), recentStartX, listsStartY, COLS, BLOCK_WIDTH);
+            }
         }
 
         // --- フッター描画 ---
@@ -1425,6 +1434,17 @@
             currentY += 50;
 
             for (let i = 0; i < list.length; i++) {
+                if (title.startsWith("BEST") && i === 30) {
+                    currentY += 40;
+                    ctx.save();
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+                    ctx.beginPath();
+                    ctx.moveTo(50, currentY - 20);
+                    ctx.lineTo(width - 50, currentY - 20);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
                 const song = list[i];
                 const songConst = song.const || 0;
                 const sssPlus = (song.const || 0) + 2.15;
