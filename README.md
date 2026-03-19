@@ -5,6 +5,7 @@ from taka-4602/chunithm-best-generator
 
 ## 画像ジェネ
 べ枠/新曲枠の画像のサムネを生成します。デフォルトで1分弱。
+同時にグラフも生成してくれるヨ。
 表示するもの
 * それぞれの枠に入っている曲
     * そいつらの→
@@ -18,17 +19,6 @@ from taka-4602/chunithm-best-generator
 javascript:(function(){
     const script = document.createElement('script');
     script.src = "https://shaln-bf.github.io/chunithm-external-tools/main.js?" + new Date().getTime();
-    document.body.appendChild(script);
-})();
-```
-
-## レート計算機
-それぞれのレートを読んでグラフを出してくれるｿﾞ
-
-```js
-javascript:(function(){
-    const script = document.createElement('script');
-    script.src = "https://shaln-bf.github.io/chunithm-external-tools/graph.js?" + new Date().getTime();
     document.body.appendChild(script);
 })();
 ```
