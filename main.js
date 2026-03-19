@@ -10,7 +10,18 @@
     const URL_PLAYER_DATA = BASE_URL + "home/playerData/";
     const URL_RATING_BEST = URL_PLAYER_DATA + "ratingDetailBest/";
     const URL_RATING_RECENT = URL_PLAYER_DATA + "ratingDetailRecent/";
+    const URL_RECORD_MUSIC_GENRE = BASE_URL + "record/musicGenre";
     const URL_SEND_DETAIL = BASE_URL + "record/musicGenre/sendMusicDetail/";
+    const URL_RECORD_SEND_BASIC = BASE_URL + "record/musicGenre/sendBasic";
+    const URL_RECORD_SEND_ADVANCED = BASE_URL + "record/musicGenre/sendAdvanced";
+    const URL_RECORD_SEND_EXPERT = BASE_URL + "record/musicGenre/sendExpert";
+    const URL_RECORD_SEND_MASTER = BASE_URL + "record/musicGenre/sendMaster";
+    const URL_RECORD_SEND_ULTIMA = BASE_URL + "record/musicGenre/sendUltima";
+    const URL_RECORD_BASIC = BASE_URL + "record/musicGenre/basic";
+    const URL_RECORD_ADVANCED = BASE_URL + "record/musicGenre/advanced";
+    const URL_RECORD_EXPERT = BASE_URL + "record/musicGenre/expert";
+    const URL_RECORD_MASTER = BASE_URL + "record/musicGenre/master";
+    const URL_RECORD_ULTIMA = BASE_URL + "record/musicGenre/ultima";
     const URL_DETAIL = BASE_URL + "record/musicDetail/";
     const URL_RANKING_MASTER_SEND = BASE_URL + "ranking/sendMaster/";
     const URL_RANKING_MASTER = BASE_URL + "ranking/master/";
@@ -23,6 +34,12 @@
     const URL_RANKING_EXPERT_SEND = URL_RANKING_DETAIL + "sendRankingExpert/";
 
     let isAborted = false;
+    const DEBUG_RECORD_FLOW = true;
+
+    const debugRecordLog = (...args) => {
+        if (!DEBUG_RECORD_FLOW) return;
+        console.log('[record-debug]', ...args);
+    };
 
     const overlay = document.createElement('div');
     const message = document.createElement('div');
@@ -466,6 +483,16 @@
         const artist = doc.querySelector('.play_musicdata_artist')?.innerText || 'N/A';
         const jacketUrl = doc.querySelector('.play_jacket_img img')?.src || '';
 
+        const parseScoreFromText = (text) => {
+            if (!text) return { scoreStr: '', scoreInt: 0 };
+            const normalized = String(text).replace(/\s+/g, '');
+            const match = normalized.match(/\d[\d,]{5,}/);
+            if (!match) return { scoreStr: '', scoreInt: 0 };
+            const scoreStr = match[0];
+            const scoreInt = parseInt(scoreStr.replace(/,/g, ''), 10) || 0;
+            return { scoreStr, scoreInt };
+        };
+
         let playCount = 'N/A';
         let scoreStr = '';
         let scoreInt = 0;
@@ -475,11 +502,11 @@
 
         if (difficultyBlock) {
             if (includeScore) {
-                const scoreElement = difficultyBlock.querySelector('.musicdata_score_num .text_b, .play_musicdata_highscore .text_b, .musicdata_highscore .text_b');
-                const parsedScoreText = scoreElement?.innerText?.trim() || '';
-                if (/^[\d,]+$/.test(parsedScoreText)) {
-                    scoreStr = parsedScoreText;
-                    scoreInt = parseInt(parsedScoreText.replace(/,/g, ''), 10) || 0;
+                const scoreElement = difficultyBlock.querySelector('.musicdata_score_num .text_b, .play_musicdata_highscore .text_b, .musicdata_highscore .text_b, .text_b');
+                const parsed = parseScoreFromText(scoreElement?.innerText || '');
+                if (parsed.scoreInt > 0) {
+                    scoreStr = parsed.scoreStr;
+                    scoreInt = parsed.scoreInt;
                 }
             }
 
@@ -489,9 +516,10 @@
                 const rowValue = row.querySelector('.musicdata_score_num .text_b')?.innerText?.trim() || '';
 
                 if (includeScore && titleElement && (titleElement.innerText.includes('ハイスコア') || titleElement.innerText.includes('HIGH SCORE'))) {
-                    if (/^[\d,]+$/.test(rowValue)) {
-                        scoreStr = rowValue;
-                        scoreInt = parseInt(rowValue.replace(/,/g, ''), 10) || 0;
+                    const parsed = parseScoreFromText(rowValue);
+                    if (parsed.scoreInt > 0) {
+                        scoreStr = parsed.scoreStr;
+                        scoreInt = parsed.scoreInt;
                     }
                 }
 
@@ -502,6 +530,15 @@
                     }
                     break;
                 }
+            }
+
+            if (includeScore && scoreInt <= 0) {
+                const blockPreview = difficultyBlock.innerText?.replace(/\s+/g, ' ').slice(0, 240) || '';
+                debugRecordLog('score-parse-miss', {
+                    params,
+                    scoreElementExists: !!difficultyBlock.querySelector('.musicdata_score_num .text_b, .play_musicdata_highscore .text_b, .musicdata_highscore .text_b, .text_b'),
+                    blockPreview,
+                });
             }
         }
         return { artist, jacketUrl, playCount, score_str: scoreStr, score_int: scoreInt };
@@ -581,9 +618,149 @@
         return initialSongList;
     };
 
+    const fetchMusicGenreSongSeeds = async () => {
+        updateMessage('レコード一覧ページにアクセス中...', 12);
+
+        const tokenRow = document.cookie.split('; ').find(row => row.startsWith('_t='));
+        const fallbackToken = tokenRow ? tokenRow.split('=')[1] : '';
+
+        const musicGenreDoc = await fetchDocument(URL_RECORD_MUSIC_GENRE);
+        if (isAborted) return null;
+
+        debugRecordLog('musicGenre-loaded', { url: URL_RECORD_MUSIC_GENRE });
+
+        const sendFormPayloads = new Map();
+        const sendForms = musicGenreDoc.querySelectorAll('form[action*="record/musicGenre/send"]');
+        debugRecordLog('send-forms-count', sendForms.length);
+        sendForms.forEach(form => {
+            const action = form.getAttribute('action') || '';
+            const actionAbs = new URL(action, window.location.origin).href;
+            const sendName = actionAbs.replace(/\/+$/, '').split('/').pop();
+            if (!sendName) return;
+
+            const payload = new URLSearchParams();
+            form.querySelectorAll('input[name]').forEach(input => {
+                payload.append(input.name, input.value || '');
+            });
+            sendFormPayloads.set(sendName, payload);
+            debugRecordLog('send-form-payload', {
+                sendName,
+                action: actionAbs,
+                keys: [...payload.keys()],
+            });
+        });
+
+        const difficultyFlows = [
+            { sendName: 'sendBasic', sendUrl: URL_RECORD_SEND_BASIC, pageUrl: URL_RECORD_BASIC },
+            { sendName: 'sendAdvanced', sendUrl: URL_RECORD_SEND_ADVANCED, pageUrl: URL_RECORD_ADVANCED },
+            { sendName: 'sendExpert', sendUrl: URL_RECORD_SEND_EXPERT, pageUrl: URL_RECORD_EXPERT },
+            { sendName: 'sendMaster', sendUrl: URL_RECORD_SEND_MASTER, pageUrl: URL_RECORD_MASTER },
+            { sendName: 'sendUltima', sendUrl: URL_RECORD_SEND_ULTIMA, pageUrl: URL_RECORD_ULTIMA },
+        ];
+
+        const resolveRedirectUrl = async (sendUrl, body, fallbackUrl, flowName = '') => {
+            let targetUrl = fallbackUrl;
+
+            try {
+                const manualRes = await fetch(sendUrl, {
+                    method: 'POST',
+                    body,
+                    redirect: 'manual'
+                });
+                const locationHeader = manualRes.headers.get('location');
+                debugRecordLog('send-manual-response', {
+                    flowName,
+                    sendUrl,
+                    status: manualRes.status,
+                    location: locationHeader,
+                    responseUrl: manualRes.url,
+                });
+                if (locationHeader) {
+                    targetUrl = new URL(locationHeader, window.location.origin).href;
+                    return targetUrl;
+                }
+            } catch (_) {
+                // manual redirect が利用できない環境では follow の結果URLを使う
+            }
+
+            const followRes = await fetch(sendUrl, {
+                method: 'POST',
+                body,
+                redirect: 'follow'
+            });
+            debugRecordLog('send-follow-response', {
+                flowName,
+                sendUrl,
+                status: followRes.status,
+                responseUrl: followRes.url,
+            });
+            if (followRes.url) {
+                targetUrl = followRes.url;
+            }
+
+            return targetUrl;
+        };
+
+        const initialSongList = [];
+        for (let i = 0; i < difficultyFlows.length; i++) {
+            if (isAborted) return null;
+            const flow = difficultyFlows[i];
+
+            const formPayload = sendFormPayloads.get(flow.sendName);
+            if (!formPayload && !fallbackToken) {
+                throw new Error('sendXxxのPOSTパラメータ取得に失敗しました。CHUNITHM-NETに再ログインしてください。');
+            }
+            const postBody = formPayload
+                ? new URLSearchParams(formPayload.toString())
+                : new URLSearchParams({ genre: '99', token: fallbackToken });
+            debugRecordLog('send-request', {
+                flow: flow.sendName,
+                sendUrl: flow.sendUrl,
+                fallbackPageUrl: flow.pageUrl,
+                payload: [...postBody.entries()],
+            });
+            const nextUrl = await resolveRedirectUrl(flow.sendUrl, postBody, flow.pageUrl, flow.sendName);
+            debugRecordLog('next-url-resolved', { flow: flow.sendName, nextUrl });
+            const doc = await fetchDocument(nextUrl);
+            const songForms = doc.querySelectorAll('form[action*="sendMusicDetail"]');
+            debugRecordLog('difficulty-page-parsed', {
+                flow: flow.sendName,
+                url: nextUrl,
+                songFormCount: songForms.length,
+            });
+            let hasLoggedSampleForm = false;
+            songForms.forEach(form => {
+                const title = form.querySelector('.music_title')?.innerText;
+                const params = {};
+                form.querySelectorAll('input[name]').forEach(input => {
+                    params[input.name] = input.value || '';
+                });
+
+                if (DEBUG_RECORD_FLOW && !hasLoggedSampleForm) {
+                    const action = form.getAttribute('action') || '';
+                    debugRecordLog('sample-song-form', {
+                        flow: flow.sendName,
+                        action,
+                        inputNames: Object.keys(params),
+                    });
+                    hasLoggedSampleForm = true;
+                }
+
+                if (!title || !params.idx || !params.token || !params.genre || !params.diff) return;
+
+                initialSongList.push({
+                    title,
+                    params
+                });
+            });
+        }
+
+        return initialSongList;
+    };
+
     const fetchAllSongsForPaidUserViaRecord = async (bestConstThreshold, newConstThreshold, delay, constData) => {
         updateMessage('有料モード(BEST TOP50): レコード経由で曲データを取得中...', 12);
-        const initialSongList = await fetchRankingSongSeeds();
+        const initialSongList = await fetchMusicGenreSongSeeds();
         if (isAborted) return null;
 
         updateMessage('定数データと照合中...', 18);
