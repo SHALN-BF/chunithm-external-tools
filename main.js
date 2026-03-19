@@ -121,12 +121,12 @@
     overlay.appendChild(globalCloseButton);
 
     /**
-     * @returns {Promise<{mode: string, delay: number, scanMode: string, bestConstThreshold: number, newConstThreshold: number}>}
+     * @returns {Promise<{delay: number, scanMode: string, frameMode: string, bestConstThreshold: number, newConstThreshold: number}>}
      */
     const askForSettings = () => {
         return new Promise(resolve => {
-            let selectedMode = null;
             let selectedScanMode = 'paid';
+            let selectedFrameMode = 'withNew';
             let scrapeDelay = 1.0;
             let bestConstThreshold = 14.5;
             let newConstThreshold = 13.5;
@@ -146,7 +146,7 @@
             container.appendChild(title);
 
             const subtitle = document.createElement('p');
-            subtitle.innerHTML = '動作モード、画像レイアウト、取得間隔を設定してください';
+            subtitle.innerHTML = '動作モード、枠構成、画像レイアウト、取得間隔を設定してください';
             subtitle.style.cssText = 'font-size: 16px; margin-bottom: 30px; color: #B0B0B0;';
             container.appendChild(subtitle);
 
@@ -185,7 +185,11 @@
                     btn.style.backgroundColor = isSelected ? '#4A90E2' : '#333';
                     btn.style.borderColor = isSelected ? '#6FBFFF' : '#555';
                 });
-                constThresholdSection.style.display = selectedScanMode === 'free' ? 'block' : 'none';
+            };
+
+            const updateConstThresholdVisibility = () => {
+                const shouldShow = selectedScanMode === 'free' || selectedFrameMode === 'best50';
+                constThresholdSection.style.display = shouldShow ? 'block' : 'none';
             };
 
             scanModeButtonsContainer.appendChild(createScanModeButton('通常モード<br><small>(Rating準拠 / 課金ユーザー)</small>', 'paid'));
@@ -239,7 +243,7 @@
             constThresholdSection.appendChild(constInputsContainer);
 
             const freeModeWarning = document.createElement('p');
-            freeModeWarning.innerHTML = '⚠️ <strong>注意:</strong> 無料モードは楽曲ランキング経由で広範囲を取得するため、完了まで時間がかかります。取得間隔は余裕を持って設定してください。';
+            freeModeWarning.innerHTML = '⚠️ <strong>注意:</strong> 無料モード / BEST TOP50モードはランキング経由で広範囲を取得するため、完了まで時間がかかります。取得間隔は余裕を持って設定してください。';
             freeModeWarning.style.cssText = 'font-size: 14px; margin-top: 15px; color: #FFC107; background-color: rgba(255, 193, 7, 0.1); padding: 10px; border-radius: 5px; border: 1px solid rgba(255, 193, 7, 0.3);';
             constThresholdSection.appendChild(freeModeWarning);
             container.appendChild(constThresholdSection);
@@ -296,55 +300,61 @@
             delaySection.appendChild(delayControls);
             container.appendChild(delaySection);
 
-            // 個人的には横派
             const modeSection = document.createElement('div');
-            modeSection.style.cssText = 'margin-bottom: 40px;';
-            const modeLabel = document.createElement('label');
-            modeLabel.textContent = '画像レイアウト';
-            modeLabel.style.cssText = 'display: block; font-size: 18px; font-weight: bold; color: #D0D0D0; margin-bottom: 15px;';
-            modeSection.appendChild(modeLabel);
-            const modeButtonsContainer = document.createElement('div');
-            modeButtonsContainer.style.cssText = 'display: flex; justify-content: center; gap: 20px;';
-            const generateButton = document.createElement('button');
-            const createModeButton = (text, mode) => {
+            modeSection.style.cssText = 'margin-bottom: 30px;';
+            modeSection.innerHTML = `
+                <label style="display: block; font-size: 18px; font-weight: bold; color: #D0D0D0; margin-bottom: 10px;">画像レイアウト</label>
+                <div style="font-size: 16px; color: #B0B0B0; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 12px;">
+                    横固定
+                </div>
+            `;
+            container.appendChild(modeSection);
+
+            const frameModeSection = document.createElement('div');
+            frameModeSection.style.cssText = 'margin-bottom: 30px;';
+            const frameModeLabel = document.createElement('label');
+            frameModeLabel.textContent = '枠構成';
+            frameModeLabel.style.cssText = 'display: block; font-size: 18px; font-weight: bold; color: #D0D0D0; margin-bottom: 15px;';
+            frameModeSection.appendChild(frameModeLabel);
+
+            const frameModeButtonsContainer = document.createElement('div');
+            frameModeButtonsContainer.style.cssText = 'display: flex; justify-content: center; gap: 20px;';
+            const createFrameModeButton = (text, frameMode) => {
                 const button = document.createElement('button');
-                button.textContent = text;
-                button.dataset.mode = mode;
+                button.innerHTML = text;
+                button.dataset.frameMode = frameMode;
                 button.style.cssText = `
-                    display: inline-block; width: 200px; padding: 15px;
-                    font-size: 18px; font-weight: bold; cursor: pointer;
-                    background-color: #333; color: white;
-                    border: 2px solid #555; border-radius: 8px;
+                    flex: 1; padding: 15px; font-size: 16px; font-weight: bold; cursor: pointer;
+                    background-color: #333; color: white; border: 2px solid #555; border-radius: 8px;
                     transition: all 0.2s ease-out;
-                    transform: translateY(0);
                 `;
-                button.onmouseover = () => {
-                    button.style.transform = 'translateY(-4px)';
-                    button.style.boxShadow = '0 6px 15px rgba(0, 0, 0, 0.3)';
-                };
-                button.onmouseout = () => {
-                    button.style.transform = 'translateY(0)';
-                    button.style.boxShadow = 'none';
-                };
                 button.onclick = () => {
-                    selectedMode = mode;
-                    document.querySelectorAll('button[data-mode]').forEach(btn => {
-                        const isSelected = btn.dataset.mode === selectedMode;
-                        btn.style.backgroundColor = isSelected ? '#4A90E2' : '#333';
-                        btn.style.borderColor = isSelected ? '#6FBFFF' : '#555';
-                    });
+                    selectedFrameMode = frameMode;
+                    updateFrameModeButtons();
+                    updateConstThresholdVisibility();
                     checkIfReady();
                 };
                 return button;
             };
-            modeButtonsContainer.appendChild(createModeButton('縦', 'vertical'));
-            modeButtonsContainer.appendChild(createModeButton('横', 'horizontal'));
-            modeSection.appendChild(modeButtonsContainer);
-            container.appendChild(modeSection);
+
+            const updateFrameModeButtons = () => {
+                document.querySelectorAll('button[data-frame-mode]').forEach(btn => {
+                    const isSelected = btn.dataset.frameMode === selectedFrameMode;
+                    btn.style.backgroundColor = isSelected ? '#4A90E2' : '#333';
+                    btn.style.borderColor = isSelected ? '#6FBFFF' : '#555';
+                });
+            };
+
+            frameModeButtonsContainer.appendChild(createFrameModeButton('NEW枠あり<br><small>(デフォルト)</small>', 'withNew'));
+            frameModeButtonsContainer.appendChild(createFrameModeButton('BEST枠のみ<br><small>(TOP50まで拡張)</small>', 'best50'));
+            frameModeSection.appendChild(frameModeButtonsContainer);
+            container.appendChild(frameModeSection);
+
+            const generateButton = document.createElement('button');
 
             // 無駄に目立たせてみた開始ボタン
             const checkIfReady = () => {
-                if (selectedMode && selectedScanMode) {
+                if (selectedScanMode) {
                     generateButton.disabled = false;
                     generateButton.style.opacity = '1';
                     generateButton.style.cursor = 'pointer';
@@ -362,8 +372,8 @@
             generateButton.onmouseover = () => { if (!generateButton.disabled) generateButton.style.background = 'linear-gradient(145deg, #4cae4c, #449d44)'; };
             generateButton.onmouseout = () => { if (!generateButton.disabled) generateButton.style.background = 'linear-gradient(145deg, #5cb85c, #4cae4c)'; };
             generateButton.onclick = () => {
-                if (selectedMode && selectedScanMode) {
-                    resolve({ mode: selectedMode, delay: scrapeDelay, scanMode: selectedScanMode, bestConstThreshold, newConstThreshold });
+                if (selectedScanMode) {
+                    resolve({ delay: scrapeDelay, scanMode: selectedScanMode, frameMode: selectedFrameMode, bestConstThreshold, newConstThreshold });
                 }
             };
             container.appendChild(generateButton);
@@ -373,6 +383,9 @@
             overlay.appendChild(globalCloseButton);
 
             updateScanModeButtons();
+            updateFrameModeButtons();
+            updateConstThresholdVisibility();
+            checkIfReady();
         });
     };
 
@@ -744,13 +757,13 @@
         });
     };
 
-    const generateImage = async (playerData, bestList, recentList, mode) => {
+    const generateImage = async (playerData, bestList, recentList) => {
         await document.fonts.load('bold 20px "Noto Sans JP"');
         await document.fonts.load('20px "Noto Sans JP"');
 
         updateMessage("背景画像を読み込み中...");
         const BG_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/`;
-        const bgUrl = mode === 'vertical' ? `${BG_BASE_URL}bg_portrait.png` : `${BG_BASE_URL}bg_landscape.png`;
+        const bgUrl = `${BG_BASE_URL}bg_landscape.png`;
         let backgroundImage;
         try {
             backgroundImage = await loadImage(bgUrl);
@@ -760,6 +773,7 @@
 
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
+        const hasRecentFrame = recentList.length > 0;
 
         const wrapText = (context, text, x, y, maxWidth, lineHeight, align = 'left', maxLines = Infinity) => {
             const words = text.split('');
@@ -811,24 +825,19 @@
         };
 
         // --- レイアウト定数 ---
-        let WIDTH, COLS, BLOCK_WIDTH, CENTER_GAP;
+        let WIDTH;
+        const COLS = 6;
+        const BLOCK_WIDTH = 210;
+        const CENTER_GAP = 75;
         const PADDING = 30;
         const HEADER_HEIGHT = 280;
         const BLOCK_HEIGHT = 400;
         const FONT_FAMILY = '"Noto Sans JP", sans-serif';
 
-        if (mode === 'vertical') {
-            WIDTH = 1920;
-            COLS = 8;
-            BLOCK_WIDTH = (WIDTH - PADDING * (COLS + 1)) / COLS;
-            CENTER_GAP = 50;
-        } else { // horizontal
-            COLS = 6;
-            BLOCK_WIDTH = 210;
-            CENTER_GAP = 75;
-            const gridWidth = (BLOCK_WIDTH * COLS) + (PADDING * (COLS - 1));
-            WIDTH = PADDING + gridWidth + CENTER_GAP + gridWidth + PADDING;
-        }
+        const gridWidth = (BLOCK_WIDTH * COLS) + (PADDING * (COLS - 1));
+        WIDTH = hasRecentFrame
+            ? PADDING + gridWidth + CENTER_GAP + gridWidth + PADDING
+            : PADDING + gridWidth + PADDING;
         const JACKET_SIZE = BLOCK_WIDTH * 0.85;
 
         const calcListHeight = (list, cols) => {
@@ -838,11 +847,9 @@
         };
 
         canvas.width = WIDTH;
-        if (mode === 'vertical') {
-            canvas.height = HEADER_HEIGHT + calcListHeight(bestList, COLS) + CENTER_GAP + calcListHeight(recentList, COLS) + PADDING;
-        } else {
-            canvas.height = HEADER_HEIGHT + Math.max(calcListHeight(bestList, COLS), calcListHeight(recentList, COLS)) + PADDING;
-        }
+        const bestListHeight = calcListHeight(bestList, COLS);
+        const recentListHeight = calcListHeight(recentList, COLS);
+        canvas.height = HEADER_HEIGHT + (hasRecentFrame ? Math.max(bestListHeight, recentListHeight) : bestListHeight) + PADDING;
 
         // --- 背景描画 (画像 or フォールバック) ---
         if (backgroundImage) {
@@ -906,7 +913,7 @@
         ctx.font = `bold 24px ${FONT_FAMILY}`;
         ctx.fillStyle = '#D1C4E9';
         ctx.fillText(`BEST Avg: ${bestAvg.toFixed(4)}`, rightX, headerY + 185);
-        ctx.fillText(`NEW Avg: ${recentAvg.toFixed(4)}`, rightX, headerY + 220);
+        ctx.fillText(`NEW Avg: ${hasRecentFrame ? recentAvg.toFixed(4) : '-'}`, rightX, headerY + 220);
 
         ctx.textAlign = 'left';
 
@@ -915,18 +922,13 @@
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.lineWidth = 2;
         ctx.setLineDash([10, 10]);
-        ctx.beginPath();
-        if (mode === 'horizontal') {
-            const gridWidth = (BLOCK_WIDTH * COLS) + (PADDING * (COLS - 1));
+        if (hasRecentFrame) {
+            ctx.beginPath();
             const lineX = PADDING + gridWidth + (CENTER_GAP / 2);
             ctx.moveTo(lineX, HEADER_HEIGHT + 15);
             ctx.lineTo(lineX, canvas.height - PADDING - 30);
-        } else { // vertical
-            const lineY = HEADER_HEIGHT + calcListHeight(bestList, COLS) + (CENTER_GAP / 2);
-            ctx.moveTo(PADDING, lineY);
-            ctx.lineTo(WIDTH - PADDING, lineY);
+            ctx.stroke();
         }
-        ctx.stroke();
         ctx.restore();
 
         // --- 画像の事前読み込み ---
@@ -1084,17 +1086,11 @@
             });
         };
 
-        if (mode === 'vertical') {
-            const bestStartY = HEADER_HEIGHT;
-            const recentStartY = bestStartY + calcListHeight(bestList, COLS) + CENTER_GAP;
-            renderSongList("BEST", songsWithImages.slice(0, bestList.length), PADDING, bestStartY, COLS, BLOCK_WIDTH);
-            renderSongList("NEW", songsWithImages.slice(bestList.length), PADDING, recentStartY, COLS, BLOCK_WIDTH);
-        } else { // horizontal
-            const listsStartY = HEADER_HEIGHT;
-            const bestStartX = PADDING;
-            const gridWidth = (BLOCK_WIDTH * COLS) + (PADDING * (COLS - 1));
+        const listsStartY = HEADER_HEIGHT;
+        const bestStartX = PADDING;
+        renderSongList(hasRecentFrame ? "BEST" : "BEST TOP50", songsWithImages.slice(0, bestList.length), bestStartX, listsStartY, COLS, BLOCK_WIDTH);
+        if (hasRecentFrame) {
             const recentStartX = PADDING + gridWidth + CENTER_GAP;
-            renderSongList("BEST", songsWithImages.slice(0, bestList.length), bestStartX, listsStartY, COLS, BLOCK_WIDTH);
             renderSongList("NEW", songsWithImages.slice(bestList.length), recentStartX, listsStartY, COLS, BLOCK_WIDTH);
         }
 
@@ -1116,20 +1112,20 @@
         return canvas.toDataURL('image/jpeg', 0.9);
     };
 
-    const generateGraphImage = async (playerData, bestList, recentList, mode) => {
+    const generateGraphImage = async (playerData, bestList, recentList) => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
+        const hasRecentFrame = recentList.length > 0;
 
-        const isVertical = mode === 'vertical';
-        const rowHeight = isVertical ? 50 : 45;
-        const baseTitleAreaWidth = isVertical ? 280 : 350;
-        const baseGraphAreaWidth = isVertical ? 590 : 1000;
+        const rowHeight = 45;
+        const baseTitleAreaWidth = 350;
+        const baseGraphAreaWidth = 1000;
         const marginLeft = Math.round(baseTitleAreaWidth * 1.2);
         const graphWidth = Math.round(baseGraphAreaWidth * 1.2);
         const marginRight = 50;
         const width = marginLeft + graphWidth + marginRight;
         const statsPanelHeight = 170;
-        const height = (isVertical ? 200 : 170) + (bestList.length * rowHeight) + 100 + (recentList.length * rowHeight) + 110 + statsPanelHeight;
+        const height = 170 + (bestList.length * rowHeight) + 100 + (recentList.length * rowHeight) + 110 + statsPanelHeight;
         canvas.width = width;
         canvas.height = height;
 
@@ -1227,7 +1223,7 @@
             ctx.fillText(r.toFixed(tickDecimals), x, 140);
         }
 
-        let currentY = isVertical ? 220 : 200;
+        let currentY = 200;
 
         const drawSection = (title, list) => {
             ctx.fillStyle = "#ffffff";
@@ -1273,7 +1269,7 @@
 
                 const colorSet = diffColors[diffAbbr] || { light: 'rgba(100,100,100,0.5)', dark: 'rgba(200,200,200,1)' };
 
-                const barHeight = isVertical ? 30 : 26;
+                const barHeight = 26;
                 const barY = currentY + 15 - barHeight / 2;
 
                 ctx.fillStyle = colorSet.light;
@@ -1360,8 +1356,10 @@
         };
 
         drawSection("BEST枠", bestList);
-        currentY += 40;
-        drawSection("新曲枠", recentList);
+        if (hasRecentFrame) {
+            currentY += 40;
+            drawSection("新曲枠", recentList);
+        }
 
         const xOverall = plotX(overallRating);
         ctx.beginPath();
@@ -1378,7 +1376,7 @@
         ctx.textAlign = 'center';
         ctx.fillText(`現在レート: ${overallRating.toFixed(2)}`, xOverall, currentY + 20);
 
-        const statsBoxWidth = isVertical ? Math.min(width - 52, 760) : Math.min(width - 52, 960);
+        const statsBoxWidth = Math.min(width - 52, 960);
         const statsBoxHeight = 160;
         const statsLineHeight = 28;
         const statsX = 26;
@@ -1399,9 +1397,21 @@
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '18px "Noto Sans JP", sans-serif';
         ctx.fillText(`BEST平均RATING: ${bestStats.avg.toFixed(4)} / 標準偏差: ${bestStats.std.toFixed(4)}`, statsX + 14, statsY + 38);
-        ctx.fillText(`新曲平均RATING: ${recentStats.avg.toFixed(4)} / 標準偏差: ${recentStats.std.toFixed(4)}`, statsX + 14, statsY + 38 + statsLineHeight);
+        ctx.fillText(
+            hasRecentFrame
+                ? `新曲平均RATING: ${recentStats.avg.toFixed(4)} / 標準偏差: ${recentStats.std.toFixed(4)}`
+                : '新曲平均RATING: N/A / 標準偏差: N/A',
+            statsX + 14,
+            statsY + 38 + statsLineHeight
+        );
         ctx.fillText(`全体標準偏差(現在レート込): ${allStats.std.toFixed(4)}  |  現在レート: ${overallRating.toFixed(4)}`, statsX + 14, statsY + 38 + (statsLineHeight * 2));
-        ctx.fillText(`更新関与の定数下限(BEST/新曲): ${bestConstLowerBound.toFixed(4)} / ${recentConstLowerBound.toFixed(4)}`, statsX + 14, statsY + 38 + (statsLineHeight * 3));
+        ctx.fillText(
+            hasRecentFrame
+                ? `更新関与の定数下限(BEST/新曲): ${bestConstLowerBound.toFixed(4)} / ${recentConstLowerBound.toFixed(4)}`
+                : `更新関与の定数下限(BEST/新曲): ${bestConstLowerBound.toFixed(4)} / N/A`,
+            statsX + 14,
+            statsY + 38 + (statsLineHeight * 3)
+        );
 
         return canvas.toDataURL('image/png');
     };
@@ -1503,7 +1513,7 @@
 
     // --- メイン処理 ---
     try {
-        const { mode, delay, scanMode, bestConstThreshold, newConstThreshold } = await askForSettings();
+        const { delay, scanMode, frameMode, bestConstThreshold, newConstThreshold } = await askForSettings();
 
         if (isAborted) return;
 
@@ -1556,8 +1566,11 @@
         let finalBestList = [];
         let finalRecentList = [];
 
-        if (scanMode === 'free') {
-            updateMessage('無料モード: ランキング経由で曲データを取得中...', 12);
+        if (scanMode === 'free' || frameMode === 'best50') {
+            const scanReason = scanMode === 'free'
+                ? '無料モード'
+                : 'BEST TOP50モード';
+            updateMessage(`${scanReason}: ランキング経由で曲データを取得中...`, 12);
             const result = await fetchAllSongsForFreeUser(bestConstThreshold, newConstThreshold, delay, constData);
             if (isAborted || !result) return;
 
@@ -1574,8 +1587,15 @@
             detailedNewSongs.sort((a, b) => b.rating - a.rating);
             detailedOldSongs.sort((a, b) => b.rating - a.rating);
 
-            finalBestList = detailedOldSongs.slice(0, 30);
-            finalRecentList = detailedNewSongs.slice(0, 20);
+            if (frameMode === 'best50') {
+                finalBestList = [...detailedOldSongs, ...detailedNewSongs]
+                    .sort((a, b) => b.rating - a.rating)
+                    .slice(0, 50);
+                finalRecentList = [];
+            } else {
+                finalBestList = detailedOldSongs.slice(0, 30);
+                finalRecentList = detailedNewSongs.slice(0, 20);
+            }
         } else {
             const detailedSongs = [];
             updateMessage('BEST枠の曲リストを取得中...', 15);
@@ -1618,11 +1638,11 @@
         }
 
         updateMessage('リスト画像を生成中...', 97);
-        const listDataUrl = await generateImage(playerData, finalBestList, finalRecentList, mode);
+        const listDataUrl = await generateImage(playerData, finalBestList, finalRecentList);
         if (isAborted) return;
 
         updateMessage('グラフ画像を生成中...', 99);
-        const graphDataUrl = await generateGraphImage(playerData, finalBestList, finalRecentList, mode);
+        const graphDataUrl = await generateGraphImage(playerData, finalBestList, finalRecentList);
         if (isAborted) return;
 
         showGeneratedImages(listDataUrl, graphDataUrl);
