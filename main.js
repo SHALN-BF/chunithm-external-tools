@@ -725,7 +725,7 @@
                 artist: songData.artist,
                 difficulty: { BAS: 'BASIC', ADV: 'ADVANCED', MAS: 'MASTER', EXP: 'EXPERT', ULT: 'ULTIMA' }[songData.diff],
                 const: Number(songData.const),
-                jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/images/jacket/${songData.img}.jpg` : '',
+                jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/html/mobile/img/${songData.img}.jpg` : '',
                 score_str: initialSong.score_str || '',
                 score_int: scoreInt,
                 rating: calculateRating(scoreInt, Number(songData.const)),
@@ -772,7 +772,7 @@
                 artist: songData.artist,
                 difficulty: { BAS: 'BASIC', ADV: 'ADVANCED', MAS: 'MASTER', EXP: 'EXPERT', ULT: 'ULTIMA' }[songData.diff],
                 const: Number(songData.const),
-                jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/images/jacket/${songData.img}.jpg` : '',
+                jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/html/mobile/img/${songData.img}.jpg` : '',
                 playCount: 'N/A',
                 params: { ...initialSong.params, diff: diffMap[songData.diff] }
             };
