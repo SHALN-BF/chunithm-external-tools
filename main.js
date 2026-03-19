@@ -174,6 +174,7 @@
                 button.onclick = () => {
                     selectedScanMode = scanMode;
                     updateScanModeButtons();
+                    updateConstThresholdVisibility();
                     checkIfReady();
                 };
                 return button;
@@ -454,7 +455,8 @@
         }
         return songs;
     };
-    const scrapeMusicDetail = async (params) => {
+    const scrapeMusicDetail = async (params, options = {}) => {
+        const { includeScore = false } = options;
         const formData = new URLSearchParams();
         Object.entries(params).forEach(([key, value]) => formData.append(key, value));
 
@@ -465,14 +467,34 @@
         const jacketUrl = doc.querySelector('.play_jacket_img img')?.src || '';
 
         let playCount = 'N/A';
+        let scoreStr = '';
+        let scoreInt = 0;
         const difficultyMap = { '0': 'basic', '1': 'advanced', '2': 'expert', '3': 'master', '4': 'ultima' };
         const diffSelector = `.music_box.bg_${difficultyMap[params.diff]}`;
         const difficultyBlock = doc.querySelector(diffSelector);
 
         if (difficultyBlock) {
+            if (includeScore) {
+                const scoreElement = difficultyBlock.querySelector('.musicdata_score_num .text_b, .play_musicdata_highscore .text_b, .musicdata_highscore .text_b');
+                const parsedScoreText = scoreElement?.innerText?.trim() || '';
+                if (/^[\d,]+$/.test(parsedScoreText)) {
+                    scoreStr = parsedScoreText;
+                    scoreInt = parseInt(parsedScoreText.replace(/,/g, ''), 10) || 0;
+                }
+            }
+
             const dataRows = difficultyBlock.querySelectorAll('.block_underline.ptb_5');
             for (const row of dataRows) {
                 const titleElement = row.querySelector('.musicdata_score_title');
+                const rowValue = row.querySelector('.musicdata_score_num .text_b')?.innerText?.trim() || '';
+
+                if (includeScore && titleElement && (titleElement.innerText.includes('ハイスコア') || titleElement.innerText.includes('HIGH SCORE'))) {
+                    if (/^[\d,]+$/.test(rowValue)) {
+                        scoreStr = rowValue;
+                        scoreInt = parseInt(rowValue.replace(/,/g, ''), 10) || 0;
+                    }
+                }
+
                 if (titleElement && titleElement.innerText.includes('プレイ回数')) {
                     const countElement = row.querySelector('.musicdata_score_num .text_b');
                     if (countElement) {
@@ -482,7 +504,7 @@
                 }
             }
         }
-        return { artist, jacketUrl, playCount };
+        return { artist, jacketUrl, playCount, score_str: scoreStr, score_int: scoreInt };
     };
 
     const normalizeTitle = (title = '') => {
@@ -528,9 +550,7 @@
         return versions[versions.length - 1];
     };
 
-    const fetchAllSongsForFreeUser = async (bestConstThreshold, newConstThreshold, delay, constData) => {
-        updateMessage('ランキングページにアクセス中...', 12);
-
+    const fetchRankingSongSeeds = async () => {
         const tokenRow = document.cookie.split('; ').find(row => row.startsWith('_t='));
         if (!tokenRow) {
             throw new Error('ランキング取得に必要なトークンが見つかりません。CHUNITHM-NETに再ログインしてください。');
@@ -557,6 +577,90 @@
                 }
             });
         });
+
+        return initialSongList;
+    };
+
+    const fetchAllSongsForPaidUserViaRecord = async (bestConstThreshold, newConstThreshold, delay, constData) => {
+        updateMessage('有料モード(BEST TOP50): レコード経由で曲データを取得中...', 12);
+        const initialSongList = await fetchRankingSongSeeds();
+        if (isAborted) return null;
+
+        updateMessage('定数データと照合中...', 18);
+        let filteredSongs = [];
+        const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
+        const currentVersionName = getCurrentVersionName(constData);
+
+        for (const songData of constData) {
+            if (!songData || !diffMap[songData.diff]) continue;
+
+            const isNewSong = songData.version === currentVersionName;
+            const threshold = isNewSong ? newConstThreshold : bestConstThreshold;
+            if (Number(songData.const) < threshold) continue;
+
+            const initialSong = initialSongList.find(s => normalizeTitle(s.title) === normalizeTitle(songData.title));
+            if (!initialSong) continue;
+
+            filteredSongs.push({
+                title: songData.title,
+                artist: songData.artist,
+                difficulty: { BAS: 'BASIC', ADV: 'ADVANCED', MAS: 'MASTER', EXP: 'EXPERT', ULT: 'ULTIMA' }[songData.diff],
+                const: Number(songData.const),
+                jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/images/jacket/${songData.img}.jpg` : '',
+                playCount: 'N/A',
+                isNewSong,
+                params: { ...initialSong.params, diff: diffMap[songData.diff] }
+            });
+        }
+
+        filteredSongs = filteredSongs.filter((song, index, self) => index === self.findIndex(s => s.title === song.title && s.difficulty === song.difficulty));
+
+        const detailedSongs = [];
+        const total = filteredSongs.length;
+        for (let i = 0; i < total; i++) {
+            if (isAborted) break;
+            const song = filteredSongs[i];
+            const progress = 20 + (i / Math.max(1, total)) * 75;
+
+            if (i > 0 && delay > 0) {
+                updateMessage(`待機中... (${delay.toFixed(2)}秒) - (${i}/${total})`, progress);
+                await sleep(delay * 1000);
+            }
+            if (isAborted) break;
+
+            try {
+                updateMessage(`レコード取得中: ${song.title} [${song.difficulty}] (${i + 1}/${total})`, progress);
+                const details = await scrapeMusicDetail(song.params, { includeScore: true });
+
+                if (!Number.isFinite(details.score_int) || details.score_int <= 0) {
+                    continue;
+                }
+
+                detailedSongs.push({
+                    ...song,
+                    ...details,
+                    rating: calculateRating(details.score_int, song.const)
+                });
+            } catch (e) {
+                console.warn(`レコード取得失敗: ${song.title}`, e);
+            }
+        }
+        if (isAborted) return null;
+
+        const detailedNewSongs = detailedSongs
+            .filter(song => song.isNewSong)
+            .map(({ isNewSong: _isNewSong, ...rest }) => rest);
+        const detailedOldSongs = detailedSongs
+            .filter(song => !song.isNewSong)
+            .map(({ isNewSong: _isNewSong, ...rest }) => rest);
+
+        return { detailedNewSongs, detailedOldSongs };
+    };
+
+    const fetchAllSongsForFreeUser = async (bestConstThreshold, newConstThreshold, delay, constData) => {
+        updateMessage('ランキングページにアクセス中...', 12);
+        const initialSongList = await fetchRankingSongSeeds();
+        if (isAborted) return null;
 
         updateMessage('定数データと照合中...', 18);
         let filteredNewSongs = [];
@@ -1567,11 +1671,9 @@
         let finalRecentList = [];
 
         if (scanMode === 'free' || frameMode === 'best50') {
-            const scanReason = scanMode === 'free'
-                ? '無料モード'
-                : 'BEST TOP50モード';
-            updateMessage(`${scanReason}: ランキング経由で曲データを取得中...`, 12);
-            const result = await fetchAllSongsForFreeUser(bestConstThreshold, newConstThreshold, delay, constData);
+            const result = (scanMode === 'free')
+                ? await fetchAllSongsForFreeUser(bestConstThreshold, newConstThreshold, delay, constData)
+                : await fetchAllSongsForPaidUserViaRecord(bestConstThreshold, newConstThreshold, delay, constData);
             if (isAborted || !result) return;
 
             const { detailedNewSongs, detailedOldSongs } = result;
