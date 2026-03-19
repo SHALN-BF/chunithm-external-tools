@@ -136,12 +136,13 @@
     overlay.appendChild(globalCloseButton);
 
     /**
-     * @returns {Promise<{delay: number, scanMode: string, frameMode: string, bestConstThreshold: number, newConstThreshold: number}>}
+     * @returns {Promise<{delay: number, scanMode: string, frameMode: string, bestConstThreshold: number, newConstThreshold: number, includeNewInBest: boolean}>}
      */
     const askForSettings = () => {
         return new Promise(resolve => {
             let selectedScanMode = 'paid';
             let selectedFrameMode = 'withNew';
+            let includeNewInBest = true;
             let scrapeDelay = 1.0;
             let bestConstThreshold = 14.5;
             let newConstThreshold = 13.5;
@@ -204,8 +205,14 @@
             };
 
             const updateConstThresholdVisibility = () => {
-                const shouldShow = selectedScanMode === 'free' || selectedFrameMode === 'best50';
+                const shouldShow = selectedScanMode === 'free';
                 constThresholdSection.style.display = shouldShow ? 'block' : 'none';
+            };
+
+            const updateOptionalSettingsVisibility = () => {
+                if (includeNewSection) {
+                    includeNewSection.style.display = (selectedFrameMode === 'best50') ? 'block' : 'none';
+                }
             };
 
             scanModeButtonsContainer.appendChild(createScanModeButton('通常モード<br><small>(Rating準拠 / 課金ユーザー)</small>', 'paid'));
@@ -359,11 +366,30 @@
                     btn.style.backgroundColor = isSelected ? '#4A90E2' : '#333';
                     btn.style.borderColor = isSelected ? '#6FBFFF' : '#555';
                 });
+                if (typeof updateOptionalSettingsVisibility === 'function') {
+                    updateOptionalSettingsVisibility();
+                }
             };
 
-            frameModeButtonsContainer.appendChild(createFrameModeButton('NEW枠あり<br><small>(デフォルト)</small>', 'withNew'));
-            frameModeButtonsContainer.appendChild(createFrameModeButton('BEST枠のみ<br><small>(TOP50まで拡張)</small>', 'best50'));
+            const includeNewSection = document.createElement('div');
+            includeNewSection.style.cssText = 'margin-top: 15px; display: none;';
+            const includeNewLabel = document.createElement('label');
+            includeNewLabel.style.cssText = 'display: inline-flex; align-items: center; cursor: pointer; color: #D0D0D0; font-size: 16px;';
+            
+            const includeNewCheckbox = document.createElement('input');
+            includeNewCheckbox.type = 'checkbox';
+            includeNewCheckbox.checked = includeNewInBest;
+            includeNewCheckbox.style.cssText = 'width: 20px; height: 20px; margin-right: 10px; cursor: pointer;';
+            includeNewCheckbox.onchange = (e) => {
+                includeNewInBest = e.target.checked;
+            };
+            
+            includeNewLabel.appendChild(includeNewCheckbox);
+            includeNewLabel.appendChild(document.createTextNode('NEW枠の曲を含める'));
+            includeNewSection.appendChild(includeNewLabel);
+            
             frameModeSection.appendChild(frameModeButtonsContainer);
+            frameModeSection.appendChild(includeNewSection);
             container.appendChild(frameModeSection);
 
             const generateButton = document.createElement('button');
@@ -389,7 +415,7 @@
             generateButton.onmouseout = () => { if (!generateButton.disabled) generateButton.style.background = 'linear-gradient(145deg, #5cb85c, #4cae4c)'; };
             generateButton.onclick = () => {
                 if (selectedScanMode) {
-                    resolve({ delay: scrapeDelay, scanMode: selectedScanMode, frameMode: selectedFrameMode, bestConstThreshold, newConstThreshold });
+                    resolve({ delay: scrapeDelay, scanMode: selectedScanMode, frameMode: selectedFrameMode, bestConstThreshold, newConstThreshold, includeNewInBest });
                 }
             };
             container.appendChild(generateButton);
@@ -1724,7 +1750,7 @@
 
     // --- メイン処理 ---
     try {
-        const { delay, scanMode, frameMode, bestConstThreshold, newConstThreshold } = await askForSettings();
+        const { delay, scanMode, frameMode, bestConstThreshold, newConstThreshold, includeNewInBest } = await askForSettings();
 
         if (isAborted) return;
 
@@ -1774,7 +1800,7 @@
             const result = (scanMode === 'free')
                 ? await fetchAllSongsForFreeUser(bestConstThreshold, newConstThreshold, delay, constData)
                 : await fetchAllSongsForPaidUserViaRecord(delay, constData, {
-                    applyConstThreshold: frameMode === 'best50',
+                    applyConstThreshold: false,
                     bestConstThreshold,
                     newConstThreshold,
                 });
@@ -1794,7 +1820,10 @@
             detailedOldSongs.sort((a, b) => b.rating - a.rating);
 
             if (frameMode === 'best50') {
-                finalBestList = [...detailedOldSongs, ...detailedNewSongs]
+                const sourceList = includeNewInBest
+                    ? [...detailedOldSongs, ...detailedNewSongs]
+                    : [...detailedOldSongs];
+                finalBestList = sourceList
                     .sort((a, b) => b.rating - a.rating)
                     .slice(0, 50);
                 finalRecentList = [];
