@@ -751,25 +751,48 @@
         return initialSongList;
     };
 
-    const fetchAllSongsForPaidUserViaRecord = async (bestConstThreshold, newConstThreshold, delay, constData) => {
-        updateMessage('有料モード(BEST TOP50): レコード経由で曲データを取得中...', 12);
+    const fetchAllSongsForPaidUserViaRecord = async (delay, constData, options = {}) => {
+        const {
+            applyConstThreshold = false,
+            bestConstThreshold = 3.0,
+            newConstThreshold = 3.0,
+        } = options;
+
+        updateMessage('有料モード: レコード経由で曲データを取得中...', 12);
         const initialSongList = await fetchMusicGenreSongSeeds();
         if (isAborted) return null;
 
         updateMessage('定数データと照合中...', 18);
         let filteredSongs = [];
         const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
+        const reverseDiffMap = { '0': 'BAS', '1': 'ADV', '2': 'EXP', '3': 'MAS', '4': 'ULT' };
         const currentVersionName = getCurrentVersionName(constData);
+
+        const songSeedMap = new Map();
+        initialSongList.forEach(song => {
+            const diffAbbreviation = reverseDiffMap[String(song.params?.diff)];
+            if (!diffAbbreviation) return;
+            const key = `${normalizeTitle(song.title)}|${diffAbbreviation}`;
+            if (!songSeedMap.has(key)) {
+                songSeedMap.set(key, song);
+            }
+        });
 
         for (const songData of constData) {
             if (!songData || !diffMap[songData.diff]) continue;
 
             const isNewSong = songData.version === currentVersionName;
-            const threshold = isNewSong ? newConstThreshold : bestConstThreshold;
-            if (Number(songData.const) < threshold) continue;
+            if (applyConstThreshold) {
+                const threshold = isNewSong ? newConstThreshold : bestConstThreshold;
+                if (Number(songData.const) < threshold) continue;
+            }
 
-            const initialSong = initialSongList.find(s => normalizeTitle(s.title) === normalizeTitle(songData.title));
+            const songKey = `${normalizeTitle(songData.title)}|${songData.diff}`;
+            const initialSong = songSeedMap.get(songKey);
             if (!initialSong) continue;
+
+            const scoreInt = Number.isFinite(initialSong.score_int) ? initialSong.score_int : 0;
+            if (scoreInt <= 0) continue;
 
             filteredSongs.push({
                 title: songData.title,
@@ -777,9 +800,9 @@
                 difficulty: { BAS: 'BASIC', ADV: 'ADVANCED', MAS: 'MASTER', EXP: 'EXPERT', ULT: 'ULTIMA' }[songData.diff],
                 const: Number(songData.const),
                 jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/images/jacket/${songData.img}.jpg` : '',
-                playCount: 'N/A',
                 score_str: initialSong.score_str || '',
-                score_int: Number.isFinite(initialSong.score_int) ? initialSong.score_int : 0,
+                score_int: scoreInt,
+                rating: calculateRating(scoreInt, Number(songData.const)),
                 isNewSong,
                 params: { ...initialSong.params, diff: diffMap[songData.diff] }
             });
@@ -787,47 +810,10 @@
 
         filteredSongs = filteredSongs.filter((song, index, self) => index === self.findIndex(s => s.title === song.title && s.difficulty === song.difficulty));
 
-        const detailedSongs = [];
-        const total = filteredSongs.length;
-        for (let i = 0; i < total; i++) {
-            if (isAborted) break;
-            const song = filteredSongs[i];
-            const progress = 20 + (i / Math.max(1, total)) * 75;
-
-            if (i > 0 && delay > 0) {
-                updateMessage(`待機中... (${delay.toFixed(2)}秒) - (${i}/${total})`, progress);
-                await sleep(delay * 1000);
-            }
-            if (isAborted) break;
-
-            try {
-                updateMessage(`レコード取得中: ${song.title} [${song.difficulty}] (${i + 1}/${total})`, progress);
-                const details = await scrapeMusicDetail(song.params, { includeScore: false });
-
-                const finalScoreInt = Number.isFinite(song.score_int) ? song.score_int : 0;
-                const finalScoreStr = song.score_str || '';
-
-                if (!Number.isFinite(finalScoreInt) || finalScoreInt <= 0) {
-                    continue;
-                }
-
-                detailedSongs.push({
-                    ...song,
-                    ...details,
-                    score_str: finalScoreStr,
-                    score_int: finalScoreInt,
-                    rating: calculateRating(finalScoreInt, song.const)
-                });
-            } catch (e) {
-                console.warn(`レコード取得失敗: ${song.title}`, e);
-            }
-        }
-        if (isAborted) return null;
-
-        const detailedNewSongs = detailedSongs
+        const detailedNewSongs = filteredSongs
             .filter(song => song.isNewSong)
             .map(({ isNewSong: _isNewSong, ...rest }) => rest);
-        const detailedOldSongs = detailedSongs
+        const detailedOldSongs = filteredSongs
             .filter(song => !song.isNewSong)
             .map(({ isNewSong: _isNewSong, ...rest }) => rest);
 
@@ -1361,8 +1347,6 @@
                 };
                 drawDataRow('CONST', song.const ? song.const.toFixed(2) : 'N/A', current_y);
                 current_y += 30;
-                drawDataRow('プレイ回数', song.playCount || 'N/A', current_y);
-                current_y += 32;
                 drawDataRow('RATING', song.rating.toFixed(2), current_y, '#81D4FA', `bold 22px ${FONT_FAMILY}`);
             });
         };
@@ -1835,22 +1819,19 @@
         updateMessage("譜面定数データをダウンロード中...", 10);
         const constData = await fetch(CONST_DATA_URL).then(res => res.json());
         console.log("定数データを取得:", constData);
-        const constMap = new Map();
-        constData.forEach(entry => {
-            const key = `${normalizeTitle(entry.title)}|${entry.diff}`;
-            if (!constMap.has(key)) {
-                constMap.set(key, entry.const);
-            }
-        });
         if (isAborted) return;
 
         let finalBestList = [];
         let finalRecentList = [];
 
-        if (scanMode === 'free' || frameMode === 'best50') {
+        if (scanMode === 'free' || scanMode === 'paid') {
             const result = (scanMode === 'free')
                 ? await fetchAllSongsForFreeUser(bestConstThreshold, newConstThreshold, delay, constData)
-                : await fetchAllSongsForPaidUserViaRecord(bestConstThreshold, newConstThreshold, delay, constData);
+                : await fetchAllSongsForPaidUserViaRecord(delay, constData, {
+                    applyConstThreshold: frameMode === 'best50',
+                    bestConstThreshold,
+                    newConstThreshold,
+                });
             if (isAborted || !result) return;
 
             const { detailedNewSongs, detailedOldSongs } = result;
@@ -1875,45 +1856,6 @@
                 finalBestList = detailedOldSongs.slice(0, 30);
                 finalRecentList = detailedNewSongs.slice(0, 20);
             }
-        } else {
-            const detailedSongs = [];
-            updateMessage('BEST枠の曲リストを取得中...', 15);
-            const bestList = await scrapeRatingList(URL_RATING_BEST);
-            if (isAborted) return;
-
-            updateMessage('新曲枠の曲リストを取得中...', 20);
-            const recentList = await scrapeRatingList(URL_RATING_RECENT);
-            if (isAborted) return;
-
-            const allSongs = [...bestList, ...recentList];
-
-            for (let i = 0; i < allSongs.length; i++) {
-                if (isAborted) break;
-                const song = allSongs[i];
-                const progress = 20 + (i / allSongs.length) * 80;
-
-                if (i > 0 && delay > 0) {
-                    updateMessage(`待機中... (${delay.toFixed(2)}秒) - (${i}/${allSongs.length})`, progress);
-                    await sleep(delay * 1000);
-                }
-
-                if (isAborted) break;
-
-                updateMessage(`楽曲詳細を取得中: ${song.title} (${i + 1}/${allSongs.length})`, progress);
-                const details = await scrapeMusicDetail(song.params);
-
-                const difficultyMapToJson = { MASTER: 'MAS', EXPERT: 'EXP', ULTIMA: 'ULT', ADVANCED: 'ADV', BASIC: 'BAS' };
-                const diffAbbreviation = difficultyMapToJson[song.difficulty];
-                const songKey = `${normalizeTitle(song.title)}|${diffAbbreviation}`;
-                const matchedConst = constMap.get(songKey);
-                const rating = calculateRating(song.score_int, matchedConst);
-
-                detailedSongs.push({ ...song, ...details, const: matchedConst || 0.0, rating });
-            }
-            if (isAborted) return;
-
-            finalBestList = detailedSongs.slice(0, bestList.length);
-            finalRecentList = detailedSongs.slice(bestList.length);
         }
 
         updateMessage('リスト画像を生成中...', 97);
