@@ -661,28 +661,6 @@
         const resolveRedirectUrl = async (sendUrl, body, fallbackUrl, flowName = '') => {
             let targetUrl = fallbackUrl;
 
-            try {
-                const manualRes = await fetch(sendUrl, {
-                    method: 'POST',
-                    body,
-                    redirect: 'manual'
-                });
-                const locationHeader = manualRes.headers.get('location');
-                debugRecordLog('send-manual-response', {
-                    flowName,
-                    sendUrl,
-                    status: manualRes.status,
-                    location: locationHeader,
-                    responseUrl: manualRes.url,
-                });
-                if (locationHeader) {
-                    targetUrl = new URL(locationHeader, window.location.origin).href;
-                    return targetUrl;
-                }
-            } catch (_) {
-                // manual redirect が利用できない環境では follow の結果URLを使う
-            }
-
             const followRes = await fetch(sendUrl, {
                 method: 'POST',
                 body,
