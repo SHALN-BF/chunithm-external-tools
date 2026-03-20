@@ -378,7 +378,7 @@
             includeNewSection.style.cssText = 'margin-top: 15px; display: none;';
             const includeNewLabel = document.createElement('label');
             includeNewLabel.style.cssText = 'display: inline-flex; align-items: center; cursor: pointer; color: #D0D0D0; font-size: 16px;';
-            
+
             const includeNewCheckbox = document.createElement('input');
             includeNewCheckbox.type = 'checkbox';
             includeNewCheckbox.checked = includeNewInBest;
@@ -386,11 +386,11 @@
             includeNewCheckbox.onchange = (e) => {
                 includeNewInBest = e.target.checked;
             };
-            
+
             includeNewLabel.appendChild(includeNewCheckbox);
             includeNewLabel.appendChild(document.createTextNode('NEW枠の曲を含める'));
             includeNewSection.appendChild(includeNewLabel);
-            
+
             frameModeSection.appendChild(frameModeButtonsContainer);
             frameModeSection.appendChild(includeNewSection);
             container.appendChild(frameModeSection);
@@ -573,7 +573,7 @@
         return initialSongList;
     };
 
-    const fetchMusicGenreSongSeeds = async () => {
+    const fetchMusicGenreSongSeeds = async (delay = 0) => {
         updateMessage('レコード一覧ページにアクセス中...', 12);
 
         const tokenRow = document.cookie.split('; ').find(row => row.startsWith('_t='));
@@ -647,6 +647,11 @@
         const initialSongList = [];
         for (let i = 0; i < difficultyFlows.length; i++) {
             if (isAborted) return null;
+
+            if (i > 0 && delay > 0) {
+                await sleep(delay * 1000);
+            }
+
             const flow = difficultyFlows[i];
 
             const formPayload = sendFormPayloads.get(flow.sendName);
@@ -714,7 +719,7 @@
         } = options;
 
         updateMessage('有料モード: レコード経由で曲データを取得中...', 12);
-        const initialSongList = await fetchMusicGenreSongSeeds();
+        const initialSongList = await fetchMusicGenreSongSeeds(delay);
         if (isAborted) return null;
 
         updateMessage('定数データと照合中...', 18);
@@ -775,7 +780,9 @@
         return { detailedNewSongs, detailedOldSongs };
     };
 
-    const fetchAllSongsForFreeUser = async (bestConstThreshold, newConstThreshold, delay, constData) => {
+    const fetchAllSongsForFreeUser = async (bestConstThreshold, newConstThreshold, delay, constData, options = {}) => {
+        const { fetchNewSongs = true } = options;
+
         updateMessage('ランキングページにアクセス中...', 12);
         const initialSongList = await fetchRankingSongSeeds();
         if (isAborted) return null;
@@ -872,8 +879,17 @@
             return detailedSongs;
         };
 
-        const detailedNewSongs = await processSongList(filteredNewSongs, '新曲枠', 20, 35);
-        if (isAborted) return null;
+        let detailedNewSongs = [];
+        if (fetchNewSongs) {
+            detailedNewSongs = await processSongList(filteredNewSongs, '新曲枠', 20, 35);
+            if (isAborted) return null;
+
+            if (delay > 0 && detailedNewSongs.length > 0) {
+                updateMessage(`待機中... (${delay.toFixed(2)}秒)`, 55);
+                await sleep(delay * 1000);
+            }
+        }
+
         const detailedOldSongs = await processSongList(filteredOldSongs, 'BEST枠', 55, 40);
         if (isAborted) return null;
 
@@ -1801,7 +1817,9 @@
 
         if (scanMode === 'free' || scanMode === 'paid') {
             const result = (scanMode === 'free')
-                ? await fetchAllSongsForFreeUser(bestConstThreshold, newConstThreshold, delay, constData)
+                ? await fetchAllSongsForFreeUser(bestConstThreshold, newConstThreshold, delay, constData, {
+                    fetchNewSongs: (frameMode === 'withNew') || includeNewInBest
+                })
                 : await fetchAllSongsForPaidUserViaRecord(delay, constData, {
                     applyConstThreshold: false,
                     bestConstThreshold,
