@@ -8,8 +8,6 @@
 
     const BASE_URL = "https://new.chunithm-net.com/chuni-mobile/html/mobile/";
     const URL_PLAYER_DATA = BASE_URL + "home/playerData/";
-    const URL_RATING_BEST = URL_PLAYER_DATA + "ratingDetailBest/";
-    const URL_RATING_RECENT = URL_PLAYER_DATA + "ratingDetailRecent/";
     const URL_RECORD_MUSIC_GENRE = BASE_URL + "record/musicGenre";
     const URL_RECORD_SEND_BASIC = BASE_URL + "record/musicGenre/sendBasic";
     const URL_RECORD_SEND_ADVANCED = BASE_URL + "record/musicGenre/sendAdvanced";
@@ -30,6 +28,14 @@
     const URL_RANKING_MASTER_DETAIL_SEND = URL_RANKING_DETAIL + "sendRankingMaster/";
     const URL_RANKING_ULTIMA_SEND = URL_RANKING_DETAIL + "sendRankingUltima/";
     const URL_RANKING_EXPERT_SEND = URL_RANKING_DETAIL + "sendRankingExpert/";
+
+    const RANKING_DETAIL_SEND_MAP = {
+        BASIC: URL_RANKING_BASIC_SEND,
+        ADVANCED: URL_RANKING_ADVANCED_SEND,
+        EXPERT: URL_RANKING_EXPERT_SEND,
+        MASTER: URL_RANKING_MASTER_DETAIL_SEND,
+        ULTIMA: URL_RANKING_ULTIMA_SEND,
+    };
 
     let isAborted = false;
     const DEBUG_RECORD_FLOW = true;
@@ -470,35 +476,6 @@
         return new DOMParser().parseFromString(htmlText, 'text/html');
     };
 
-    const scrapeRatingList = async (url) => {
-        const doc = await fetchDocument(url);
-        const songForms = doc.querySelectorAll('form[action$="sendMusicDetail/"]');
-        const songs = [];
-        for (const form of songForms) {
-            const difficultyClass = form.querySelector('div[class*="bg_"]').className;
-            let difficulty = "UNKNOWN";
-
-            if (difficultyClass.includes("basic")) difficulty = "BASIC";
-            else if (difficultyClass.includes("advanced")) difficulty = "ADVANCED";
-            else if (difficultyClass.includes("master")) difficulty = "MASTER";
-            else if (difficultyClass.includes("expert")) difficulty = "EXPERT";
-            else if (difficultyClass.includes("ultima")) difficulty = "ULTIMA";
-
-            songs.push({
-                title: form.querySelector('.music_title').innerText,
-                score_str: form.querySelector('.text_b').innerText,
-                score_int: parseInt(form.querySelector('.text_b').innerText.replace(/,/g, ''), 10),
-                difficulty: difficulty,
-                params: {
-                    idx: form.querySelector('input[name="idx"]').value,
-                    token: form.querySelector('input[name="token"]').value,
-                    genre: form.querySelector('input[name="genre"]').value,
-                    diff: form.querySelector('input[name="diff"]').value,
-                }
-            });
-        }
-        return songs;
-    };
     const normalizeTitle = (title = '') => {
         return title
             .replace(/\u3000/g, ' ')
@@ -507,6 +484,11 @@
             .replace(/[“”]/g, '"')
             .trim()
             .toLowerCase();
+    };
+
+    const getToken = () => {
+        const tokenRow = document.cookie.split('; ').find(row => row.startsWith('_t='));
+        return tokenRow ? tokenRow.split('=')[1] : null;
     };
 
     const getCurrentVersionName = (constData) => {
@@ -542,12 +524,103 @@
         return versions[versions.length - 1];
     };
 
+    const calculateRating = (score, constant) => {
+        score = Number(score);
+        constant = Number(constant);
+        if (isNaN(score) || isNaN(constant)) return 0.00;
+
+        let r = 0;
+
+        if (score >= 1009000) {
+            // SSS+: 譜面定数 + 2.15
+            r = constant + 2.15;
+        } else if (score >= 1007500) {
+            // SSS: 譜面定数 + 2.0 + (100点毎に+0.01)
+            r = constant + 2.00 + (score - 1007500) * 0.0001;
+        } else if (score >= 1005000) {
+            // SS+: 譜面定数 + 1.5 + (50点毎に+0.01)
+            r = constant + 1.50 + (score - 1005000) * 0.0002;
+        } else if (score >= 1000000) {
+            // SS: 譜面定数 + 1.0 + (100点毎に+0.01)
+            r = constant + 1.00 + (score - 1000000) * 0.0001;
+        } else if (score >= 990000) {
+            // S+: 譜面定数 + 0.6 + (250点毎に+0.01)
+            r = constant + 0.60 + (score - 990000) * 0.00004;
+        } else if (score >= 975000) {
+            // S: 譜面定数 + (975,000点を超えた分/25,000)
+            r = constant + (score - 975000) / 25000;
+        } else if (score >= 950000) {
+            // AAA: 譜面定数 - 1.67 + (150点毎に+0.01)
+            r = constant - 1.67 + (score - 950000) / 15000;
+        } else if (score >= 925000) {
+            // AA: 譜面定数 - 3.34 + (150点毎に+0.01)
+            r = constant - 3.34 + (score - 925000) / 15000;
+        } else if (score >= 900000) {
+            // A: 譜面定数 - 5.0 + (150点毎に+0.01)
+            r = constant - 5.00 + (score - 900000) / 15000;
+        } else if (score >= 800000) {
+            const base = (constant - 5.0) / 2;
+            const pointsPer001 = 2000 / (constant - 5.0);
+            const increment = (score - 800000) / pointsPer001 * 0.01;
+            r = base + increment;
+        } else if (score >= 500000) {
+            const pointsPer001 = 6000 / (constant - 5.0);
+            const increment = (score - 500000) / pointsPer001 * 0.01;
+            r = increment;
+        } else {
+            r = 0;
+        }
+
+        if (r < 0) r = 0;
+        const internal = Math.floor(r * 10000) / 10000;
+        return Math.floor(internal * 100) / 100;
+    };
+
+    const getRankInfo = (score) => {
+        if (score >= 1009000) return { rank: "SSS+", color: "#FFD700" };
+        if (score >= 1007500) return { rank: "SSS", color: "#ffdf75" };
+        if (score >= 1005000) return { rank: "SS+", color: "#ffda8aff" };
+        if (score >= 1000000) return { rank: "SS", color: "#fcc652ff" };
+        if (score >= 975000) return { rank: "S", color: "#ffaf47ff" };
+        if (score >= 950000) return { rank: "AAA", color: "#f44336" };
+        if (score >= 925000) return { rank: "AA", color: "#f44336" };
+        if (score >= 900000) return { rank: "A", color: "#f44336" };
+        if (score >= 800000) return { rank: "BBB", color: "#2196F3" };
+        if (score >= 700000) return { rank: "BB", color: "#2196F3" };
+        if (score >= 600000) return { rank: "B", color: "#2196F3" };
+        if (score >= 500000) return { rank: "C", color: "#795548" };
+        return { rank: "D", color: "#9E9E9E" };
+    };
+
+    const drawRoundRect = (ctx, x, y, width, height, radius) => {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+    };
+
+    const loadImage = (url) => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => resolve(img);
+            img.onerror = (err) => reject(err);
+            img.src = url;
+        });
+    };
+
     const fetchRankingSongSeeds = async () => {
-        const tokenRow = document.cookie.split('; ').find(row => row.startsWith('_t='));
-        if (!tokenRow) {
+        const token = getToken();
+        if (!token) {
             throw new Error('ランキング取得に必要なトークンが見つかりません。CHUNITHM-NETに再ログインしてください。');
         }
-        const token = tokenRow.split('=')[1];
 
         await fetch(URL_RANKING_MASTER_SEND, {
             method: 'POST',
@@ -576,8 +649,7 @@
     const fetchMusicGenreSongSeeds = async (delay = 0) => {
         updateMessage('レコード一覧ページにアクセス中...', 12);
 
-        const tokenRow = document.cookie.split('; ').find(row => row.startsWith('_t='));
-        const fallbackToken = tokenRow ? tokenRow.split('=')[1] : '';
+        const fallbackToken = getToken();
 
         const musicGenreDoc = await fetchDocument(URL_RECORD_MUSIC_GENRE);
         if (isAborted) return null;
@@ -780,6 +852,55 @@
         return { detailedNewSongs, detailedOldSongs };
     };
 
+    const processSongList = async (list, delay, type, startProgress, progressShare) => {
+        const detailedSongs = [];
+        const total = list.length;
+
+        for (let i = 0; i < total; i++) {
+            if (isAborted) break;
+            const song = list[i];
+            const progress = startProgress + (i / Math.max(1, total)) * progressShare;
+
+            if (i > 0 && delay > 0) {
+                updateMessage(`待機中... (${delay.toFixed(2)}秒) - (${i}/${total})`, progress);
+                await sleep(delay * 1000);
+            }
+            if (isAborted) break;
+
+            try {
+                updateMessage(`${type}取得中: ${song.title} [${song.difficulty}] (${i + 1}/${total})`, progress);
+                await fetch(URL_RANKING_DETAIL_SEND, { method: 'POST', body: new URLSearchParams(song.params) });
+
+                const difficultyDetailUrl = RANKING_DETAIL_SEND_MAP[song.difficulty];
+                if (difficultyDetailUrl) {
+                    await fetch(difficultyDetailUrl, {
+                        method: 'POST',
+                        body: new URLSearchParams({ ...song.params, category: '1', region: '1' })
+                    });
+                }
+                const scoreDoc = await fetchDocument(URL_RANKING_DETAIL);
+
+                const scoreElement = scoreDoc.querySelector('.rank_playdata_highscore .text_b');
+                const jacketElement = scoreDoc.querySelector('.play_jacket_img img');
+                if (!scoreElement) continue;
+
+                const scoreStr = scoreElement.innerText;
+                const scoreInt = parseInt(scoreStr.replace(/,/g, ''), 10);
+                if (!Number.isFinite(scoreInt) || scoreInt <= 0) continue;
+
+                detailedSongs.push({
+                    ...song,
+                    score_str: scoreStr,
+                    score_int: scoreInt,
+                    jacketUrl: jacketElement?.src || song.jacketUrl,
+                });
+            } catch (e) {
+                console.warn(`スコア取得失敗: ${song.title}`, e);
+            }
+        }
+        return detailedSongs;
+    };
+
     const fetchAllSongsForFreeUser = async (bestConstThreshold, newConstThreshold, delay, constData, options = {}) => {
         const { fetchNewSongs = true } = options;
 
@@ -823,65 +944,9 @@
         filteredNewSongs = filteredNewSongs.filter((song, index, self) => index === self.findIndex(s => s.title === song.title && s.difficulty === song.difficulty));
         filteredOldSongs = filteredOldSongs.filter((song, index, self) => index === self.findIndex(s => s.title === song.title && s.difficulty === song.difficulty));
 
-        const processSongList = async (list, type, startProgress, progressShare) => {
-            const detailedSongs = [];
-            const total = list.length;
-
-            for (let i = 0; i < total; i++) {
-                if (isAborted) break;
-                const song = list[i];
-                const progress = startProgress + (i / Math.max(1, total)) * progressShare;
-
-                if (i > 0 && delay > 0) {
-                    updateMessage(`待機中... (${delay.toFixed(2)}秒) - (${i}/${total})`, progress);
-                    await sleep(delay * 1000);
-                }
-                if (isAborted) break;
-
-                try {
-                    updateMessage(`${type}取得中: ${song.title} [${song.difficulty}] (${i + 1}/${total})`, progress);
-                    await fetch(URL_RANKING_DETAIL_SEND, { method: 'POST', body: new URLSearchParams(song.params) });
-
-                    const rankingDetailSendByDifficulty = {
-                        BASIC: URL_RANKING_BASIC_SEND,
-                        ADVANCED: URL_RANKING_ADVANCED_SEND,
-                        EXPERT: URL_RANKING_EXPERT_SEND,
-                        MASTER: URL_RANKING_MASTER_DETAIL_SEND,
-                        ULTIMA: URL_RANKING_ULTIMA_SEND,
-                    };
-                    const difficultyDetailUrl = rankingDetailSendByDifficulty[song.difficulty];
-                    if (difficultyDetailUrl) {
-                        await fetch(difficultyDetailUrl, {
-                            method: 'POST',
-                            body: new URLSearchParams({ ...song.params, category: '1', region: '1' })
-                        });
-                    }
-                    const scoreDoc = await fetchDocument(URL_RANKING_DETAIL);
-
-                    const scoreElement = scoreDoc.querySelector('.rank_playdata_highscore .text_b');
-                    const jacketElement = scoreDoc.querySelector('.play_jacket_img img');
-                    if (!scoreElement) continue;
-
-                    const scoreStr = scoreElement.innerText;
-                    const scoreInt = parseInt(scoreStr.replace(/,/g, ''), 10);
-                    if (!Number.isFinite(scoreInt) || scoreInt <= 0) continue;
-
-                    detailedSongs.push({
-                        ...song,
-                        score_str: scoreStr,
-                        score_int: scoreInt,
-                        jacketUrl: jacketElement?.src || song.jacketUrl,
-                    });
-                } catch (e) {
-                    console.warn(`スコア取得失敗: ${song.title}`, e);
-                }
-            }
-            return detailedSongs;
-        };
-
         let detailedNewSongs = [];
         if (fetchNewSongs) {
-            detailedNewSongs = await processSongList(filteredNewSongs, '新曲枠', 20, 35);
+            detailedNewSongs = await processSongList(filteredNewSongs, delay, '新曲枠', 20, 35);
             if (isAborted) return null;
 
             if (delay > 0 && detailedNewSongs.length > 0) {
@@ -890,109 +955,18 @@
             }
         }
 
-        const detailedOldSongs = await processSongList(filteredOldSongs, 'BEST枠', 55, 40);
+        const detailedOldSongs = await processSongList(filteredOldSongs, delay, 'BEST枠', 55, 40);
         if (isAborted) return null;
 
         return { detailedNewSongs, detailedOldSongs };
     };
 
-    const calculateRating = (score, constant) => {
-        score = Number(score);
-        constant = Number(constant);
-        if (isNaN(score) || isNaN(constant)) return 0.00;
-
-        let r = 0;
-
-        if (score >= 1009000) {
-            // SSS+: 譜面定数 + 2.15
-            r = constant + 2.15;
-        } else if (score >= 1007500) {
-            // SSS: 譜面定数 + 2.0 + (100点毎に+0.01)
-            r = constant + 2.00 + (score - 1007500) * 0.0001;
-        } else if (score >= 1005000) {
-            // SS+: 譜面定数 + 1.5 + (50点毎に+0.01)
-            r = constant + 1.50 + (score - 1005000) * 0.0002;
-        } else if (score >= 1000000) {
-            // SS: 譜面定数 + 1.0 + (100点毎に+0.01)
-            r = constant + 1.00 + (score - 1000000) * 0.0001;
-        } else if (score >= 990000) {
-            // S+: 譜面定数 + 0.6 + (250点毎に+0.01)
-            r = constant + 0.60 + (score - 990000) * 0.00004;
-        } else if (score >= 975000) {
-            // S: 譜面定数 + (975,000点を超えた分/25,000)
-            r = constant + (score - 975000) / 25000;
-        } else if (score >= 950000) {
-            // AAA: 譜面定数 - 1.67 + (150点毎に+0.01)
-            r = constant - 1.67 + (score - 950000) / 15000;
-        } else if (score >= 925000) {
-            // AA: 譜面定数 - 3.34 + (150点毎に+0.01)
-            r = constant - 3.34 + (score - 925000) / 15000;
-        } else if (score >= 900000) {
-            // A: 譜面定数 - 5.0 + (150点毎に+0.01)
-            r = constant - 5.00 + (score - 900000) / 15000;
-        } else if (score >= 800000) {
-            // BBB: (譜面定数 - 5.0) / 2 + 加算分
-            // 800,000点時点で (譜面定数 - 5.0) / 2
-            // 2000/(譜面定数-5)点毎に+0.01 = (譜面定数-5)/2000点毎に+0.01
-            const base = (constant - 5.0) / 2;
-            const pointsPer001 = 2000 / (constant - 5.0);
-            const increment = (score - 800000) / pointsPer001 * 0.01;
-            r = base + increment;
-        } else if (score >= 500000) {
-            // C: 0 + 加算分
-            // 500,000点時点で 0
-            // 6000/(譜面定数-5)点毎に+0.01 = (譜面定数-5)/6000点毎に+0.01
-            const pointsPer001 = 6000 / (constant - 5.0);
-            const increment = (score - 500000) / pointsPer001 * 0.01;
-            r = increment;
-        } else {
-            // 500,000未満は0
-            r = 0;
+    const calculateAverageRating = (list) => {
+        if (!list || list.length === 0) {
+            return 0.0;
         }
-
-        // 0以下の場合は0になる
-        if (r < 0) r = 0;
-
-        const internal = Math.floor(r * 10000) / 10000;
-        return Math.floor(internal * 100) / 100;
-    };
-
-    const getRankInfo = (score) => {
-        if (score >= 1009000) return { rank: "SSS+", color: "#FFD700" };
-        if (score >= 1007500) return { rank: "SSS", color: "#ffdf75" };
-        if (score >= 1005000) return { rank: "SS+", color: "#ffda8aff" };
-        if (score >= 1000000) return { rank: "SS", color: "#fcc652ff" };
-        if (score >= 975000) return { rank: "S", color: "#ffaf47ff" };
-        if (score >= 950000) return { rank: "AAA", color: "#f44336" };
-        if (score >= 925000) return { rank: "AA", color: "#f44336" };
-        if (score >= 900000) return { rank: "A", color: "#f44336" };
-        if (score >= 800000) return { rank: "BBB", color: "#2196F3" };
-        if (score >= 700000) return { rank: "BB", color: "#2196F3" };
-        if (score >= 600000) return { rank: "B", color: "#2196F3" };
-        if (score >= 500000) return { rank: "C", color: "#795548" };
-        return { rank: "D", color: "#9E9E9E" };
-    };
-    const drawRoundRect = (ctx, x, y, width, height, radius) => {
-        ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + width - radius, y);
-        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-        ctx.lineTo(x + width, y + height - radius);
-        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-        ctx.lineTo(x + radius, y + height);
-        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
-    };
-    const loadImage = (url) => {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.onload = () => resolve(img);
-            img.onerror = (err) => reject(err);
-            img.src = url;
-        });
+        const total = list.reduce((sum, song) => sum + (song.rating ?? 0), 0);
+        return total / list.length;
     };
 
     const generateImage = async (playerData, bestList, recentList) => {
@@ -1051,15 +1025,6 @@
             }
             drawLine(line, currentY);
             return { finalY: currentY, lines: lineCount };
-        };
-
-        const calculateAverageRating = (list) => {
-            if (!list || list.length === 0) {
-                return 0.0;
-            }
-
-            const total = list.reduce((sum, song) => sum + (song.rating ?? 0), 0);
-            return total / list.length;
         };
 
         // --- レイアウト定数 ---
