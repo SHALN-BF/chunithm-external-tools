@@ -646,8 +646,10 @@
         return initialSongList;
     };
 
-    const fetchMusicGenreSongSeeds = async (delay = 0) => {
-        updateMessage('レコード一覧ページにアクセス中...', 12);
+    const fetchMusicGenreSongSeeds = async (delay = 0, updateProgress = null) => {
+        if (!updateProgress) {
+            updateMessage('レコード一覧ページにアクセス中...', 12);
+        }
 
         const fallbackToken = getToken();
 
@@ -720,11 +722,14 @@
         for (let i = 0; i < difficultyFlows.length; i++) {
             if (isAborted) return null;
 
+            const flow = difficultyFlows[i];
+            if (updateProgress) {
+                updateProgress(flow.sendName, i, difficultyFlows.length);
+            }
+
             if (i > 0 && delay > 0) {
                 await sleep(delay * 1000);
             }
-
-            const flow = difficultyFlows[i];
 
             const formPayload = sendFormPayloads.get(flow.sendName);
             if (!formPayload && !fallbackToken) {
@@ -791,10 +796,20 @@
         } = options;
 
         updateMessage('有料モード: レコード経由で曲データを取得中...', 12);
-        const initialSongList = await fetchMusicGenreSongSeeds(delay);
+        const initialSongList = await fetchMusicGenreSongSeeds(delay, (flowName, index, total) => {
+            const progress = 12 + ((index + 1) / total) * (88 - 12);
+            let displayFlowName = flowName.replace('send', '').toUpperCase();
+            if (displayFlowName === 'BASIC') displayFlowName = 'BASIC';
+            else if (displayFlowName === 'ADVANCED') displayFlowName = 'ADVANCED';
+            else if (displayFlowName === 'EXPERT') displayFlowName = 'EXPERT';
+            else if (displayFlowName === 'MASTER') displayFlowName = 'MASTER';
+            else if (displayFlowName === 'ULTIMA') displayFlowName = 'ULTIMA';
+
+            updateMessage(`有料モード: ${displayFlowName}を取得中 (${index + 1}/${total})...`, progress);
+        });
         if (isAborted) return null;
 
-        updateMessage('定数データと照合中...', 18);
+        updateMessage('定数データと照合中...', 90);
         let filteredSongs = [];
         const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
         const reverseDiffMap = { '0': 'BAS', '1': 'ADV', '2': 'EXP', '3': 'MAS', '4': 'ULT' };
@@ -904,11 +919,11 @@
     const fetchAllSongsForFreeUser = async (bestConstThreshold, newConstThreshold, delay, constData, options = {}) => {
         const { fetchNewSongs = true } = options;
 
-        updateMessage('ランキングページにアクセス中...', 12);
+        updateMessage('ランキングページにアクセス中...', 5);
         const initialSongList = await fetchRankingSongSeeds();
         if (isAborted) return null;
 
-        updateMessage('定数データと照合中...', 18);
+        updateMessage('定数データと照合中...', 10);
         let filteredNewSongs = [];
         let filteredOldSongs = [];
         const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
@@ -945,17 +960,22 @@
         filteredOldSongs = filteredOldSongs.filter((song, index, self) => index === self.findIndex(s => s.title === song.title && s.difficulty === song.difficulty));
 
         let detailedNewSongs = [];
+        let currentProgress = 10;
+
         if (fetchNewSongs) {
-            detailedNewSongs = await processSongList(filteredNewSongs, delay, '新曲枠', 20, 35);
+            const newShare = 35;
+            detailedNewSongs = await processSongList(filteredNewSongs, delay, '新曲枠', currentProgress, newShare);
+            currentProgress += newShare;
             if (isAborted) return null;
 
             if (delay > 0 && detailedNewSongs.length > 0) {
-                updateMessage(`待機中... (${delay.toFixed(2)}秒)`, 55);
+                updateMessage(`待機中... (${delay.toFixed(2)}秒)`, currentProgress);
                 await sleep(delay * 1000);
             }
         }
 
-        const detailedOldSongs = await processSongList(filteredOldSongs, delay, 'BEST枠', 55, 40);
+        const remainingShare = 95 - currentProgress;
+        const detailedOldSongs = await processSongList(filteredOldSongs, delay, 'BEST枠', currentProgress, remainingShare);
         if (isAborted) return null;
 
         return { detailedNewSongs, detailedOldSongs };
