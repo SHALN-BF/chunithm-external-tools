@@ -1175,8 +1175,16 @@
                 const diffStyle = difficultyInfo[song.difficulty] || difficultyInfo.UNKNOWN;
                 // カード背景
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                ctx.strokeStyle = diffStyle.bg;
-                ctx.lineWidth = 1;
+                if (song.difficulty === 'ULTIMA') {
+                    const bgGradient = ctx.createLinearGradient(x, y, x + blockWidth, y + BLOCK_HEIGHT);
+                    bgGradient.addColorStop(0, '#ff0000');
+                    bgGradient.addColorStop(1, '#000000');
+                    ctx.strokeStyle = bgGradient;
+                    ctx.lineWidth = 2;
+                } else {
+                    ctx.strokeStyle = diffStyle.bg;
+                    ctx.lineWidth = 1;
+                }
                 ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
                 ctx.shadowBlur = 15;
                 ctx.shadowOffsetX = 5;
@@ -1220,7 +1228,7 @@
                 ctx.save();
                 if (song.difficulty === 'ULTIMA') {
                     const grad = ctx.createLinearGradient(ribbonX, ribbonY, ribbonX + ribbonWidth, ribbonY);
-                    grad.addColorStop(0, '#a00'); grad.addColorStop(1, '#1a1a1a');
+                    grad.addColorStop(0, '#ff0000'); grad.addColorStop(1, '#000000');
                     ctx.fillStyle = grad;
                 } else { ctx.fillStyle = diffStyle.bg; }
                 drawRoundRect(ctx, ribbonX, ribbonY, ribbonWidth, ribbonHeight, 8);
