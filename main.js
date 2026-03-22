@@ -1151,7 +1151,7 @@
         const songsWithImages = await Promise.all(imagePromises);
 
         // --- 楽曲リスト描画関数 ---
-        const renderSongList = (title, list, startX, startY, cols, blockWidth) => {
+        const renderSongList = (title, list, startX, startY, cols, blockWidth, startRank = 1) => {
             ctx.font = `bold 38px ${FONT_FAMILY}`;
             ctx.fillStyle = '#FFFFFF';
             ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
@@ -1216,7 +1216,7 @@
                 }
 
                 // ジャケット右上の番号と難易度帯
-                const numberText = `#${i + 1}`;
+                const numberText = `#${i + startRank}`;
                 ctx.font = `bold 30px ${FONT_FAMILY}`;
                 const textMetrics = ctx.measureText(numberText);
                 const textWidth = textMetrics.width;
@@ -1301,14 +1301,14 @@
         const listsStartY = HEADER_HEIGHT;
         const bestStartX = PADDING;
         if (isBest50Mode) {
-            renderSongList("BEST 1-30", songsWithImages.slice(0, 30), bestStartX, listsStartY, COLS, BLOCK_WIDTH);
+            renderSongList("BEST 1-30", songsWithImages.slice(0, 30), bestStartX, listsStartY, COLS, BLOCK_WIDTH, 1);
             const rightStartX = PADDING + gridWidth + CENTER_GAP;
-            renderSongList("BEST 31-50", songsWithImages.slice(30), rightStartX, listsStartY, COLS, BLOCK_WIDTH);
+            renderSongList("BEST 31-50", songsWithImages.slice(30), rightStartX, listsStartY, COLS, BLOCK_WIDTH, 31);
         } else {
-            renderSongList(hasRecentFrame ? "BEST" : "BEST TOP50", songsWithImages.slice(0, bestList.length), bestStartX, listsStartY, COLS, BLOCK_WIDTH);
+            renderSongList(hasRecentFrame ? "BEST" : "BEST TOP50", songsWithImages.slice(0, bestList.length), bestStartX, listsStartY, COLS, BLOCK_WIDTH, 1);
             if (hasRecentFrame) {
                 const recentStartX = PADDING + gridWidth + CENTER_GAP;
-                renderSongList("NEW", songsWithImages.slice(bestList.length), recentStartX, listsStartY, COLS, BLOCK_WIDTH);
+                renderSongList("NEW", songsWithImages.slice(bestList.length), recentStartX, listsStartY, COLS, BLOCK_WIDTH, 1);
             }
         }
 
