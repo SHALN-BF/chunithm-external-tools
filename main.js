@@ -1,33 +1,71 @@
 (async function () {
     'use strict';
-    const CURRENT_VERSION = "X-VERSE-X";
+    const CONSTANTS = {
+        VERSION: "X-VERSE-X",
+        URLS: {
+            BASE: "https://new.chunithm-net.com/chuni-mobile/html/mobile/",
+            CONST_DATA: `https://reiwa.f5.si/chunithm_record.json`,
+            PLAYER_DATA: "home/playerData/",
+            RECORD: {
+                GENRE: "record/musicGenre",
+                SEND: {
+                    BASIC: "record/musicGenre/sendBasic",
+                    ADVANCED: "record/musicGenre/sendAdvanced",
+                    EXPERT: "record/musicGenre/sendExpert",
+                    MASTER: "record/musicGenre/sendMaster",
+                    ULTIMA: "record/musicGenre/sendUltima"
+                },
+                PAGE: {
+                    BASIC: "record/musicGenre/basic",
+                    ADVANCED: "record/musicGenre/advanced",
+                    EXPERT: "record/musicGenre/expert",
+                    MASTER: "record/musicGenre/master",
+                    ULTIMA: "record/musicGenre/ultima"
+                }
+            },
+            RANKING: {
+                MASTER_SEND: "ranking/sendMaster/",
+                MASTER: "ranking/master/",
+                DETAIL_SEND: "ranking/sendRankingDetail/",
+                DETAIL: "ranking/musicRankingDetail/",
+                SEND_DETAIL: {
+                    BASIC: "sendRankingBasic/",
+                    ADVANCED: "sendRankingAdvanced/",
+                    EXPERT: "sendRankingExpert/",
+                    MASTER: "sendRankingMaster/",
+                    ULTIMA: "sendRankingUltima/"
+                }
+            }
+        }
+    };
 
+    // 以前の定数定義をCONSTANTSオブジェクトの参照に置き換え
+    const CURRENT_VERSION = CONSTANTS.VERSION;
     const GITHUB_USER = "SHALN-BF";
     const GITHUB_REPO = "chunithm-external-tools";
-    const CONST_DATA_URL = `https://reiwa.f5.si/chunithm_record.json`;
-
-    const BASE_URL = "https://new.chunithm-net.com/chuni-mobile/html/mobile/";
-    const URL_PLAYER_DATA = BASE_URL + "home/playerData/";
-    const URL_RECORD_MUSIC_GENRE = BASE_URL + "record/musicGenre";
-    const URL_RECORD_SEND_BASIC = BASE_URL + "record/musicGenre/sendBasic";
-    const URL_RECORD_SEND_ADVANCED = BASE_URL + "record/musicGenre/sendAdvanced";
-    const URL_RECORD_SEND_EXPERT = BASE_URL + "record/musicGenre/sendExpert";
-    const URL_RECORD_SEND_MASTER = BASE_URL + "record/musicGenre/sendMaster";
-    const URL_RECORD_SEND_ULTIMA = BASE_URL + "record/musicGenre/sendUltima";
-    const URL_RECORD_BASIC = BASE_URL + "record/musicGenre/basic";
-    const URL_RECORD_ADVANCED = BASE_URL + "record/musicGenre/advanced";
-    const URL_RECORD_EXPERT = BASE_URL + "record/musicGenre/expert";
-    const URL_RECORD_MASTER = BASE_URL + "record/musicGenre/master";
-    const URL_RECORD_ULTIMA = BASE_URL + "record/musicGenre/ultima";
-    const URL_RANKING_MASTER_SEND = BASE_URL + "ranking/sendMaster/";
-    const URL_RANKING_MASTER = BASE_URL + "ranking/master/";
-    const URL_RANKING_DETAIL_SEND = BASE_URL + "ranking/sendRankingDetail/";
-    const URL_RANKING_DETAIL = BASE_URL + "ranking/musicRankingDetail/";
-    const URL_RANKING_BASIC_SEND = URL_RANKING_DETAIL + "sendRankingBasic/";
-    const URL_RANKING_ADVANCED_SEND = URL_RANKING_DETAIL + "sendRankingAdvanced/";
-    const URL_RANKING_MASTER_DETAIL_SEND = URL_RANKING_DETAIL + "sendRankingMaster/";
-    const URL_RANKING_ULTIMA_SEND = URL_RANKING_DETAIL + "sendRankingUltima/";
-    const URL_RANKING_EXPERT_SEND = URL_RANKING_DETAIL + "sendRankingExpert/";
+    const CONST_DATA_URL = CONSTANTS.URLS.CONST_DATA;
+    const BASE_URL = CONSTANTS.URLS.BASE;
+    const URL_PLAYER_DATA = BASE_URL + CONSTANTS.URLS.PLAYER_DATA;
+    const URL_RECORD_MUSIC_GENRE = BASE_URL + CONSTANTS.URLS.RECORD.GENRE;
+    const URL_RECORD_SEND_BASIC = BASE_URL + CONSTANTS.URLS.RECORD.SEND.BASIC;
+    const URL_RECORD_SEND_ADVANCED = BASE_URL + CONSTANTS.URLS.RECORD.SEND.ADVANCED;
+    const URL_RECORD_SEND_EXPERT = BASE_URL + CONSTANTS.URLS.RECORD.SEND.EXPERT;
+    const URL_RECORD_SEND_MASTER = BASE_URL + CONSTANTS.URLS.RECORD.SEND.MASTER;
+    const URL_RECORD_SEND_ULTIMA = BASE_URL + CONSTANTS.URLS.RECORD.SEND.ULTIMA;
+    const URL_RECORD_BASIC = BASE_URL + CONSTANTS.URLS.RECORD.PAGE.BASIC;
+    const URL_RECORD_ADVANCED = BASE_URL + CONSTANTS.URLS.RECORD.PAGE.ADVANCED;
+    const URL_RECORD_EXPERT = BASE_URL + CONSTANTS.URLS.RECORD.PAGE.EXPERT;
+    const URL_RECORD_MASTER = BASE_URL + CONSTANTS.URLS.RECORD.PAGE.MASTER;
+    const URL_RECORD_ULTIMA = BASE_URL + CONSTANTS.URLS.RECORD.PAGE.ULTIMA;
+    const URL_RANKING_MASTER_SEND = BASE_URL + CONSTANTS.URLS.RANKING.MASTER_SEND;
+    const URL_RANKING_MASTER = BASE_URL + CONSTANTS.URLS.RANKING.MASTER;
+    const URL_RANKING_DETAIL_SEND = BASE_URL + CONSTANTS.URLS.RANKING.DETAIL_SEND;
+    const URL_RANKING_DETAIL = BASE_URL + CONSTANTS.URLS.RANKING.DETAIL;
+    const URL_RANKING_BASIC_SEND = URL_RANKING_DETAIL + CONSTANTS.URLS.RANKING.SEND_DETAIL.BASIC;
+    const URL_RANKING_ADVANCED_SEND = URL_RANKING_DETAIL + CONSTANTS.URLS.RANKING.SEND_DETAIL.ADVANCED;
+    const URL_RANKING_MASTER_DETAIL_SEND = URL_RANKING_DETAIL + CONSTANTS.URLS.RANKING.SEND_DETAIL.MASTER;
+    const URL_RANKING_ULTIMA_SEND = URL_RANKING_DETAIL + CONSTANTS.URLS.RANKING.SEND_DETAIL.ULTIMA;
+    const URL_RANKING_EXPERT_SEND = URL_RANKING_DETAIL + CONSTANTS.URLS.RANKING.SEND_DETAIL.EXPERT;
 
     const RANKING_DETAIL_SEND_MAP = {
         BASIC: URL_RANKING_BASIC_SEND,
@@ -35,6 +73,169 @@
         EXPERT: URL_RANKING_EXPERT_SEND,
         MASTER: URL_RANKING_MASTER_DETAIL_SEND,
         ULTIMA: URL_RANKING_ULTIMA_SEND,
+    };
+
+    /**
+     * テキストを指定された幅で折り返す関数（共通ヘルパー）
+     */
+    const wrapText = (context, text, x, y, maxWidth, lineHeight, align = 'left', maxLines = Infinity) => {
+        const words = text.split('');
+        let line = '';
+        let currentY = y;
+        let lineCount = 1;
+
+        const drawLine = (line, y) => {
+            let drawX = x;
+            if (align === 'center') {
+                const lineWidth = context.measureText(line).width;
+                drawX = x + (maxWidth - lineWidth) / 2;
+            }
+            context.fillText(line, drawX, y);
+        };
+
+        for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n];
+            const metrics = context.measureText(testLine);
+            const testWidth = metrics.width;
+            if (testWidth > maxWidth && n > 0) {
+                if (lineCount >= maxLines) {
+                    let truncatedLine = line;
+                    while (context.measureText(truncatedLine + '…').width > maxWidth && truncatedLine.length > 0) {
+                        truncatedLine = truncatedLine.slice(0, -1);
+                    }
+                    drawLine(truncatedLine + '…', currentY);
+                    return { finalY: currentY, lines: lineCount };
+                }
+                drawLine(line, currentY);
+                line = words[n];
+                currentY += lineHeight;
+                lineCount++;
+            } else {
+                line = testLine;
+            }
+        }
+        drawLine(line, currentY);
+        return { finalY: currentY, lines: lineCount };
+    };
+
+    /**
+     * Parse score string to integer
+     */
+    const parseScoreFromText = (text) => {
+        if (!text) return { scoreStr: '', scoreInt: 0 };
+        const normalized = String(text).replace(/\s+/g, '');
+        const match = normalized.match(/\d[\d,]{5,}/);
+        if (!match) return { scoreStr: '', scoreInt: 0 };
+        const scoreStr = match[0];
+        const scoreInt = parseInt(scoreStr.replace(/,/g, ''), 10) || 0;
+        return { scoreStr, scoreInt };
+    };
+
+    const DIFFICULTY_STYLES = {
+        ULTIMA: { bg: 'linear-gradient(135deg, #a00, #310000)', stroke: '#ff0000', gradientStart: '#ff0000', gradientEnd: '#000000' },
+        MASTER: { bg: '#8A2BE2' },
+        EXPERT: { bg: '#ff1100ff' },
+        ADVANCED: { bg: '#FDD835' },
+        BASIC: { bg: '#7CB342' },
+        UNKNOWN: { bg: '#9E9E9E' }
+    };
+
+    /**
+     * constDataとinitialSongListを照合してリスト化する共通ヘルパー
+     */
+    const filterAndEnrichSongsWithConstData = (constData, initialSongList, options) => {
+        const {
+            matchMode = 'exact', // 'exact' (Title+Diff) or 'title' (Title only)
+            bestConstThreshold = 14.5,
+            newConstThreshold = 13.5,
+            applyConstThreshold = true,
+            currentVersionName = '',
+        } = options;
+
+        const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
+        const diffNameMap = { BAS: 'BASIC', ADV: 'ADVANCED', EXP: 'EXPERT', MAS: 'MASTER', ULT: 'ULTIMA' };
+        const reverseDiffMap = { '0': 'BAS', '1': 'ADV', '2': 'EXP', '3': 'MAS', '4': 'ULT' };
+
+        const songSeedMap = new Map();
+
+        if (matchMode === 'exact') {
+            initialSongList.forEach(song => {
+                const diffAbbreviation = reverseDiffMap[String(song.params?.diff)];
+                if (!diffAbbreviation) return;
+                const key = `${normalizeTitle(song.title)}|${diffAbbreviation}`;
+                if (!songSeedMap.has(key)) {
+                    songSeedMap.set(key, song);
+                }
+            });
+        } else {
+            initialSongList.forEach(s => {
+                const nTitle = normalizeTitle(s.title);
+                if (!songSeedMap.has(nTitle)) {
+                    songSeedMap.set(nTitle, s);
+                }
+            });
+        }
+
+        let rawNewSongs = [];
+        let rawOldSongs = [];
+
+        for (const songData of constData) {
+            if (!songData || !diffMap[songData.diff]) continue;
+
+            const isNewSong = songData.version === currentVersionName;
+
+            if (applyConstThreshold) {
+                const threshold = isNewSong ? newConstThreshold : bestConstThreshold;
+                if (Number(songData.const) < threshold) continue;
+            }
+
+            let initialSong = null;
+            if (matchMode === 'exact') {
+                const key = `${normalizeTitle(songData.title)}|${songData.diff}`;
+                initialSong = songSeedMap.get(key);
+            } else {
+                initialSong = songSeedMap.get(normalizeTitle(songData.title));
+            }
+
+            if (!initialSong) continue;
+
+            const scoreInt = (matchMode === 'exact' && Number.isFinite(initialSong.score_int)) ? initialSong.score_int : 0;
+            // Paid mode (exact) skips if score is 0.
+            if (matchMode === 'exact' && scoreInt <= 0) continue;
+
+            const params = matchMode === 'exact'
+                ? initialSong.params
+                : { ...initialSong.params, diff: diffMap[songData.diff] };
+
+            const songObject = {
+                title: songData.title,
+                artist: songData.artist,
+                difficulty: diffNameMap[songData.diff],
+                const: Number(songData.const),
+                score_int: scoreInt,
+                score_str: (matchMode === 'exact' && initialSong.score_str) ? initialSong.score_str : '',
+                playCount: 'N/A',
+                params: params,
+                jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/html/mobile/img/${songData.img}.jpg` : '',
+            };
+
+            if (matchMode === 'exact' && scoreInt > 0) {
+                songObject.rating = calculateRating(scoreInt, songObject.const);
+            }
+
+            if (isNewSong) {
+                rawNewSongs.push(songObject);
+            } else {
+                rawOldSongs.push(songObject);
+            }
+        }
+
+        const uniqueFilter = (song, index, self) => index === self.findIndex(s => s.title === song.title && s.difficulty === song.difficulty);
+
+        return {
+            filteredNewSongs: rawNewSongs.filter(uniqueFilter),
+            filteredOldSongs: rawOldSongs.filter(uniqueFilter)
+        };
     };
 
     let isAborted = false;
@@ -687,16 +888,6 @@
             { sendName: 'sendUltima', sendUrl: URL_RECORD_SEND_ULTIMA, pageUrl: URL_RECORD_ULTIMA },
         ];
 
-        const parseScoreFromText = (text) => {
-            if (!text) return { scoreStr: '', scoreInt: 0 };
-            const normalized = String(text).replace(/\s+/g, '');
-            const match = normalized.match(/\d[\d,]{5,}/);
-            if (!match) return { scoreStr: '', scoreInt: 0 };
-            const scoreStr = match[0];
-            const scoreInt = parseInt(scoreStr.replace(/,/g, ''), 10) || 0;
-            return { scoreStr, scoreInt };
-        };
-
         const resolveRedirectUrl = async (sendUrl, body, fallbackUrl, flowName = '') => {
             let targetUrl = fallbackUrl;
 
@@ -809,62 +1000,19 @@
         });
         if (isAborted) return null;
 
-        updateMessage('定数データと照合中...', 90);
-        let filteredSongs = [];
-        const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
-        const reverseDiffMap = { '0': 'BAS', '1': 'ADV', '2': 'EXP', '3': 'MAS', '4': 'ULT' };
+        updateMessage('定数データとお気に入り曲を照合中...', 90);
+
         const currentVersionName = getCurrentVersionName(constData);
 
-        const songSeedMap = new Map();
-        initialSongList.forEach(song => {
-            const diffAbbreviation = reverseDiffMap[String(song.params?.diff)];
-            if (!diffAbbreviation) return;
-            const key = `${normalizeTitle(song.title)}|${diffAbbreviation}`;
-            if (!songSeedMap.has(key)) {
-                songSeedMap.set(key, song);
-            }
+        const { filteredNewSongs, filteredOldSongs } = filterAndEnrichSongsWithConstData(constData, initialSongList, {
+            matchMode: 'exact',
+            bestConstThreshold,
+            newConstThreshold,
+            applyConstThreshold,
+            currentVersionName
         });
 
-        for (const songData of constData) {
-            if (!songData || !diffMap[songData.diff]) continue;
-
-            const isNewSong = songData.version === currentVersionName;
-            if (applyConstThreshold) {
-                const threshold = isNewSong ? newConstThreshold : bestConstThreshold;
-                if (Number(songData.const) < threshold) continue;
-            }
-
-            const songKey = `${normalizeTitle(songData.title)}|${songData.diff}`;
-            const initialSong = songSeedMap.get(songKey);
-            if (!initialSong) continue;
-
-            const scoreInt = Number.isFinite(initialSong.score_int) ? initialSong.score_int : 0;
-            if (scoreInt <= 0) continue;
-
-            filteredSongs.push({
-                title: songData.title,
-                artist: songData.artist,
-                difficulty: { BAS: 'BASIC', ADV: 'ADVANCED', MAS: 'MASTER', EXP: 'EXPERT', ULT: 'ULTIMA' }[songData.diff],
-                const: Number(songData.const),
-                jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/html/mobile/img/${songData.img}.jpg` : '',
-                score_str: initialSong.score_str || '',
-                score_int: scoreInt,
-                rating: calculateRating(scoreInt, Number(songData.const)),
-                isNewSong,
-                params: { ...initialSong.params, diff: diffMap[songData.diff] }
-            });
-        }
-
-        filteredSongs = filteredSongs.filter((song, index, self) => index === self.findIndex(s => s.title === song.title && s.difficulty === song.difficulty));
-
-        const detailedNewSongs = filteredSongs
-            .filter(song => song.isNewSong)
-            .map(({ isNewSong: _isNewSong, ...rest }) => rest);
-        const detailedOldSongs = filteredSongs
-            .filter(song => !song.isNewSong)
-            .map(({ isNewSong: _isNewSong, ...rest }) => rest);
-
-        return { detailedNewSongs, detailedOldSongs };
+        return { detailedNewSongs: filteredNewSongs, detailedOldSongs: filteredOldSongs };
     };
 
     const processSongList = async (list, delay, type, startProgress, progressShare) => {
@@ -924,47 +1072,23 @@
         if (isAborted) return null;
 
         updateMessage('定数データと照合中...', 10);
-        let filteredNewSongs = [];
-        let filteredOldSongs = [];
-        const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
+
         const currentVersionName = getCurrentVersionName(constData);
 
-        for (const songData of constData) {
-            if (!songData || !diffMap[songData.diff]) continue;
-
-            const isNewSong = songData.version === currentVersionName;
-            const threshold = isNewSong ? newConstThreshold : bestConstThreshold;
-            if (Number(songData.const) < threshold) continue;
-
-            const initialSong = initialSongList.find(s => normalizeTitle(s.title) === normalizeTitle(songData.title));
-            if (!initialSong) continue;
-
-            const songObject = {
-                title: songData.title,
-                artist: songData.artist,
-                difficulty: { BAS: 'BASIC', ADV: 'ADVANCED', MAS: 'MASTER', EXP: 'EXPERT', ULT: 'ULTIMA' }[songData.diff],
-                const: Number(songData.const),
-                jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/html/mobile/img/${songData.img}.jpg` : '',
-                playCount: 'N/A',
-                params: { ...initialSong.params, diff: diffMap[songData.diff] }
-            };
-
-            if (isNewSong) {
-                filteredNewSongs.push(songObject);
-            } else {
-                filteredOldSongs.push(songObject);
-            }
-        }
-
-        filteredNewSongs = filteredNewSongs.filter((song, index, self) => index === self.findIndex(s => s.title === song.title && s.difficulty === song.difficulty));
-        filteredOldSongs = filteredOldSongs.filter((song, index, self) => index === self.findIndex(s => s.title === song.title && s.difficulty === song.difficulty));
+        const { filteredNewSongs: rawNewSongs, filteredOldSongs: rawOldSongs } = filterAndEnrichSongsWithConstData(constData, initialSongList, {
+            matchMode: 'title',
+            bestConstThreshold,
+            newConstThreshold,
+            applyConstThreshold: true,
+            currentVersionName
+        });
 
         let detailedNewSongs = [];
         let currentProgress = 10;
 
         if (fetchNewSongs) {
             const newShare = 35;
-            detailedNewSongs = await processSongList(filteredNewSongs, delay, '新曲枠', currentProgress, newShare);
+            detailedNewSongs = await processSongList(rawNewSongs, delay, '新曲枠', currentProgress, newShare);
             currentProgress += newShare;
             if (isAborted) return null;
 
@@ -975,7 +1099,7 @@
         }
 
         const remainingShare = 95 - currentProgress;
-        const detailedOldSongs = await processSongList(filteredOldSongs, delay, 'BEST枠', currentProgress, remainingShare);
+        const detailedOldSongs = await processSongList(rawOldSongs, delay, 'BEST枠', currentProgress, remainingShare);
         if (isAborted) return null;
 
         return { detailedNewSongs, detailedOldSongs };
@@ -1006,46 +1130,6 @@
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         const hasRecentFrame = recentList.length > 0;
-
-        const wrapText = (context, text, x, y, maxWidth, lineHeight, align = 'left', maxLines = Infinity) => {
-            const words = text.split('');
-            let line = '';
-            let currentY = y;
-            let lineCount = 1;
-
-            const drawLine = (line, y) => {
-                let drawX = x;
-                if (align === 'center') {
-                    const lineWidth = context.measureText(line).width;
-                    drawX = x + (maxWidth - lineWidth) / 2;
-                }
-                context.fillText(line, drawX, y);
-            };
-
-            for (let n = 0; n < words.length; n++) {
-                const testLine = line + words[n];
-                const metrics = context.measureText(testLine);
-                const testWidth = metrics.width;
-                if (testWidth > maxWidth && n > 0) {
-                    if (lineCount >= maxLines) {
-                        let truncatedLine = line;
-                        while (context.measureText(truncatedLine + '…').width > maxWidth) {
-                            truncatedLine = truncatedLine.slice(0, -1);
-                        }
-                        drawLine(truncatedLine + '…', currentY);
-                        return { finalY: currentY, lines: lineCount };
-                    }
-                    drawLine(line, currentY);
-                    line = words[n];
-                    currentY += lineHeight;
-                    lineCount++;
-                } else {
-                    line = testLine;
-                }
-            }
-            drawLine(line, currentY);
-            return { finalY: currentY, lines: lineCount };
-        };
 
         // --- レイアウト定数 ---
         const isBest50Mode = (!hasRecentFrame && bestList.length === 50);
@@ -1186,19 +1270,13 @@
                 const x = startX + col * (blockWidth + PADDING);
                 const y = startY + 70 + row * (BLOCK_HEIGHT + PADDING);
 
-                const difficultyInfo = {
-                    ULTIMA: { bg: 'linear-gradient(135deg, #a00, #310000)' },
-                    MASTER: { bg: '#8A2BE2' }, EXPERT: { bg: '#ff1100ff' },
-                    ADVANCED: { bg: '#FDD835' }, BASIC: { bg: '#7CB342' },
-                    UNKNOWN: { bg: '#9E9E9E' }
-                };
-                const diffStyle = difficultyInfo[song.difficulty] || difficultyInfo.UNKNOWN;
+                const diffStyle = DIFFICULTY_STYLES[song.difficulty] || DIFFICULTY_STYLES.UNKNOWN;
                 // カード背景
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
                 if (song.difficulty === 'ULTIMA') {
                     const bgGradient = ctx.createLinearGradient(x, y, x + blockWidth, y + BLOCK_HEIGHT);
-                    bgGradient.addColorStop(0, '#ff0000');
-                    bgGradient.addColorStop(1, '#000000');
+                    bgGradient.addColorStop(0, diffStyle.gradientStart);
+                    bgGradient.addColorStop(1, diffStyle.gradientEnd);
                     ctx.strokeStyle = bgGradient;
                     ctx.lineWidth = 2;
                 } else {
@@ -1248,7 +1326,7 @@
                 ctx.save();
                 if (song.difficulty === 'ULTIMA') {
                     const grad = ctx.createLinearGradient(ribbonX, ribbonY, ribbonX + ribbonWidth, ribbonY);
-                    grad.addColorStop(0, '#ff0000'); grad.addColorStop(1, '#000000');
+                    grad.addColorStop(0, diffStyle.gradientStart); grad.addColorStop(1, diffStyle.gradientEnd);
                     ctx.fillStyle = grad;
                 } else { ctx.fillStyle = diffStyle.bg; }
                 drawRoundRect(ctx, ribbonX, ribbonY, ribbonWidth, ribbonHeight, 8);
