@@ -8,5 +8,3 @@
 * Items to be handed over or noted should be updated as needed in the “Handover Items” section below.
 ## Handover Items
 * 
-
-Translated with DeepL.com (free version)
