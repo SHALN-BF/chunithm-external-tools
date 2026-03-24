@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, WebhookClient } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, WebhookClient, Events, MessageFlags } = require('discord.js');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const userManager = require('./userManager');
@@ -46,7 +46,7 @@ const commands = [
         .setDescription('Generate your Chunithm Best Score image.')
 ];
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
     logToWebhook(`✅ Logged in as ${client.user.tag}!`);
     console.log(`Allowed users: ${process.env.ALLOWED_USERS}`);
 
@@ -68,7 +68,7 @@ client.once('ready', async () => {
     }
 });
 
-client.on('interactionCreate', async interaction => {
+client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName } = interaction;
@@ -79,18 +79,18 @@ client.on('interactionCreate', async interaction => {
 
         // Check permissions
         if (!userManager.isUserAllowed(interaction.user.id)) {
-            await interaction.reply({ content: 'You are not authorized to use this bot.', ephemeral: true });
+            await interaction.reply({ content: 'You are not authorized to use this bot.', flags: MessageFlags.Ephemeral });
             logToWebhook(`🚫 Unauthorized access attempt to /register by <@${interaction.user.id}>`);
             return;
         }
 
         try {
             userManager.registerUser(interaction.user.id, segaId, password);
-            await interaction.reply({ content: 'Credentials registered successfully!', ephemeral: true });
+            await interaction.reply({ content: 'Credentials registered successfully!', flags: MessageFlags.Ephemeral });
             logToWebhook(`📝 User <@${interaction.user.id}> registered new credentials.`);
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'Failed to register credentials.', ephemeral: true });
+            await interaction.reply({ content: 'Failed to register credentials.', flags: MessageFlags.Ephemeral });
             logToWebhook(`❌ Error registering credentials for <@${interaction.user.id}>: ${error.message}`);
         }
     } else if (commandName === 'best') {
@@ -104,7 +104,7 @@ client.on('interactionCreate', async interaction => {
         if ((currentHour === 1 && currentMinute >= 30) || (currentHour > 1 && currentHour < 7)) {
             await interaction.reply({
                 content: 'CHUNITHM-NET is currently under maintenance (01:30 - 07:00 JST). Please try again later.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
             return;
         }
@@ -112,7 +112,7 @@ client.on('interactionCreate', async interaction => {
         // Check permissions
         const creds = userManager.getCredentials(interaction.user.id);
         if (!creds) {
-            await interaction.reply({ content: 'You are not registered. Please use `/register` first.', ephemeral: true });
+            await interaction.reply({ content: 'You are not registered. Please use `/register` first.', flags: MessageFlags.Ephemeral });
             return;
         }
 
