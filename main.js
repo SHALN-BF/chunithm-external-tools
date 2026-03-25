@@ -81,7 +81,7 @@
         ULTIMA: URL_RANKING_ULTIMA_SEND,
     };
 
-    const HIDE_SCORE = Boolean(window.__hideScore);
+    let HIDE_SCORE = Boolean(window.__hideScore);
 
     /**
      * テキストを指定された幅で折り返す関数（共通ヘルパー）
@@ -351,7 +351,7 @@
     overlay.appendChild(globalCloseButton);
 
     /**
-     * @returns {Promise<{delay: number, scanMode: string, frameMode: string, bestConstThreshold: number, newConstThreshold: number, includeNewInBest: boolean}>}
+    * @returns {Promise<{delay: number, scanMode: string, frameMode: string, bestConstThreshold: number, newConstThreshold: number, includeNewInBest: boolean, hideScore: boolean}>}
      */
     const askForSettings = () => {
         return new Promise(resolve => {
@@ -359,6 +359,7 @@
             let selectedFrameMode = 'withNew';
             let includeNewInBest = true;
             let scrapeDelay = 1.0;
+            let hideScore = false;
             let bestConstThreshold = 14.5;
             let newConstThreshold = 13.5;
 
@@ -610,6 +611,24 @@
             frameModeSection.appendChild(includeNewSection);
             container.appendChild(frameModeSection);
 
+            const hideScoreSection = document.createElement('div');
+            hideScoreSection.style.cssText = 'margin-bottom: 30px;';
+            const hideScoreLabel = document.createElement('label');
+            hideScoreLabel.style.cssText = 'display: inline-flex; align-items: center; cursor: pointer; color: #D0D0D0; font-size: 16px;';
+
+            const hideScoreCheckbox = document.createElement('input');
+            hideScoreCheckbox.type = 'checkbox';
+            hideScoreCheckbox.checked = hideScore;
+            hideScoreCheckbox.style.cssText = 'width: 20px; height: 20px; margin-right: 10px; cursor: pointer;';
+            hideScoreCheckbox.onchange = (e) => {
+                hideScore = e.target.checked;
+            };
+
+            hideScoreLabel.appendChild(hideScoreCheckbox);
+            hideScoreLabel.appendChild(document.createTextNode('スコア・レート・ランクを非表示にする (HIDESCORE)'));
+            hideScoreSection.appendChild(hideScoreLabel);
+            container.appendChild(hideScoreSection);
+
             const generateButton = document.createElement('button');
 
             // 無駄に目立たせてみた開始ボタン
@@ -633,7 +652,7 @@
             generateButton.onmouseout = () => { if (!generateButton.disabled) generateButton.style.background = 'linear-gradient(145deg, #5cb85c, #4cae4c)'; };
             generateButton.onclick = () => {
                 if (selectedScanMode) {
-                    resolve({ delay: scrapeDelay, scanMode: selectedScanMode, frameMode: selectedFrameMode, bestConstThreshold, newConstThreshold, includeNewInBest });
+                    resolve({ delay: scrapeDelay, scanMode: selectedScanMode, frameMode: selectedFrameMode, bestConstThreshold, newConstThreshold, includeNewInBest, hideScore });
                 }
             };
             container.appendChild(generateButton);
@@ -1936,7 +1955,10 @@
 
     // --- メイン処理 ---
     try {
-        const { delay, scanMode, frameMode, bestConstThreshold, newConstThreshold, includeNewInBest } = await askForSettings();
+        const { delay, scanMode, frameMode, bestConstThreshold, newConstThreshold, includeNewInBest, hideScore } = await askForSettings();
+
+        HIDE_SCORE = Boolean(hideScore);
+        window.__hideScore = HIDE_SCORE;
 
         if (isAborted) return;
 

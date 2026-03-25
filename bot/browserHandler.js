@@ -311,7 +311,8 @@ class BrowserHandler {
                         frameMode: settings.frameMode,
                         bestConstThreshold: settings.bestConstThreshold,
                         newConstThreshold: settings.newConstThreshold,
-                        includeNewInBest: settings.includeNewInBest
+                        includeNewInBest: settings.includeNewInBest,
+                        hideScore: settings.hideScore
                     };
                 };
 
