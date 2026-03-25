@@ -1900,13 +1900,17 @@
 
             const image = document.createElement('img');
             image.src = dataUrl;
-            image.style.cssText = 'max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px;';
+            image.alt = cardTitle;
+            image.style.cssText = 'max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px; cursor: pointer;';
+            image.onclick = () => window.open(dataUrl, '_blank', 'noopener');
             imageArea.appendChild(image);
+
+            const buttonRow = document.createElement('div');
+            buttonRow.style.cssText = 'display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;';
 
             const saveButton = document.createElement('button');
             saveButton.textContent = `${cardTitle}を保存`;
             saveButton.style.cssText = `
-                margin-top: 10px;
                 padding: 10px 16px;
                 font-size: 14px;
                 font-weight: bold;
@@ -1923,9 +1927,26 @@
                 a.click();
             };
 
+            const openButton = document.createElement('button');
+            openButton.textContent = '新しいタブで開く';
+            openButton.style.cssText = `
+                padding: 10px 16px;
+                font-size: 14px;
+                font-weight: bold;
+                cursor: pointer;
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 8px;
+            `;
+            openButton.onclick = () => window.open(dataUrl, '_blank', 'noopener');
+
+            buttonRow.appendChild(saveButton);
+            buttonRow.appendChild(openButton);
+
             card.appendChild(heading);
             card.appendChild(imageArea);
-            card.appendChild(saveButton);
+            card.appendChild(buttonRow);
             return card;
         };
 
