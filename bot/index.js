@@ -139,14 +139,6 @@ const baseCommands = [
     new SlashCommandBuilder()
         .setName('best')
         .setDescription('Generate your Chunithm Best Score image.')
-        .addStringOption(option =>
-            option.setName('scanmode')
-                .setDescription('Select paid/free scan mode (auto if omitted).')
-                .addChoices(
-                    { name: 'paid', value: 'paid' },
-                    { name: 'free', value: 'free' }
-                )
-                .setRequired(false))
         .addBooleanOption(option =>
             option.setName('hidescore')
                 .setDescription('Hide rating, score, and rank from the images.')
@@ -379,14 +371,12 @@ client.on(Events.InteractionCreate, async interaction => {
 
         try {
             const hideScore = interaction.options.getBoolean('hidescore') ?? false;
-            const scanMode = interaction.options.getString('scanmode');
             const bestConstThreshold = interaction.options.getNumber('best_const_min');
             const newConstThreshold = interaction.options.getNumber('new_const_min');
             const bestOnly = interaction.options.getBoolean('best_only') ?? false;
 
             const result = await browserHandler.generateScoreImage(creds.segaId, creds.password, {
                 hideScore,
-                scanMode,
                 bestConstThreshold,
                 newConstThreshold,
                 bestOnly
@@ -426,7 +416,6 @@ client.on(Events.InteractionCreate, async interaction => {
                 if (hideScore) {
                     const fullResult = await browserHandler.generateScoreImage(creds.segaId, creds.password, {
                         hideScore: false,
-                        scanMode,
                         bestConstThreshold,
                         newConstThreshold,
                         bestOnly

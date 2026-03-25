@@ -317,9 +317,15 @@ class BrowserHandler {
                 throw e;
             }
 
+            const baseTimeoutMs = Number(process.env.BOT_GENERATION_TIMEOUT_MS ?? '180000');
+            const freeTimeoutMs = Number(process.env.BOT_GENERATION_TIMEOUT_FREE_MS ?? '900000');
+            const generationTimeoutMs = (effectiveScanMode === 'free')
+                ? (Number.isFinite(freeTimeoutMs) ? freeTimeoutMs : 900000)
+                : (Number.isFinite(baseTimeoutMs) ? baseTimeoutMs : 180000);
+
             console.log(`[${segaId}] Waiting for generation (can take 1-2 mins)...`);
             try {
-                await page.waitForFunction(() => window.generatedResult, { timeout: 180000 });
+                await page.waitForFunction(() => window.generatedResult, { timeout: generationTimeoutMs });
             } catch (e) {
                 throw new Error("Generation timed out.");
             }

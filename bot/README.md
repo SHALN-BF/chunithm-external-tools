@@ -23,6 +23,9 @@ This is a Discord bot that automates the generation of Chunithm Best Score image
     - `REQUEST_WEBHOOK_URL`: Fallback request destination if no channel is configured.
     - `LOG_WEBHOOK_URL`: Optional webhook for log messages and full-score images.
     - `GUILD_IDS`: Comma-separated list of guild IDs for registering `g-` prefixed commands.
+    - `BOT_DELAY_MS`: Delay between requests in milliseconds (defaults to 1000ms). Internally converted to seconds.
+    - `BOT_GENERATION_TIMEOUT_MS`: Generation timeout (paid/standard) in milliseconds (defaults to 180000ms).
+    - `BOT_GENERATION_TIMEOUT_FREE_MS`: Generation timeout (free mode) in milliseconds (defaults to 900000ms).
 
 3.  **Run the Bot**:
     ```bash
