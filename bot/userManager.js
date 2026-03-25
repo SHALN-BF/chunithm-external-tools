@@ -4,9 +4,6 @@ const crypto = require('crypto');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const USERS_FILE = path.join(__dirname, 'users.json');
-const LEGACY_USER_DATA_FILE = path.join(__dirname, 'userData.json');
-const LEGACY_APPROVALS_FILE = path.join(__dirname, 'approvals.json');
-const LEGACY_PENDING_REQUESTS_FILE = path.join(__dirname, 'pendingRequests.json');
 const ALLOWED_USERS = (process.env.ALLOWED_USERS || '').split(',').map(u => u.trim());
 
 // Encryption settings
@@ -42,55 +39,7 @@ function loadStore() {
         }
     }
 
-    const store = { users: {} };
-
-    if (fs.existsSync(LEGACY_APPROVALS_FILE)) {
-        try {
-            const legacyApprovals = JSON.parse(fs.readFileSync(LEGACY_APPROVALS_FILE, 'utf8'));
-            (legacyApprovals.approvedUsers || []).forEach(userId => {
-                if (!store.users[userId]) store.users[userId] = {};
-                store.users[userId].status = 'approved';
-            });
-        } catch (e) {
-            console.error("Failed to load legacy approvals:", e);
-        }
-    }
-
-    if (fs.existsSync(LEGACY_USER_DATA_FILE)) {
-        try {
-            const legacyData = JSON.parse(fs.readFileSync(LEGACY_USER_DATA_FILE, 'utf8'));
-            Object.entries(legacyData).forEach(([userId, data]) => {
-                if (!store.users[userId]) store.users[userId] = {};
-                store.users[userId].credentials = {
-                    segaId: data.segaId,
-                    password: data.password
-                };
-            });
-        } catch (e) {
-            console.error("Failed to load legacy user data:", e);
-        }
-    }
-
-    if (fs.existsSync(LEGACY_PENDING_REQUESTS_FILE)) {
-        try {
-            const legacyRequests = JSON.parse(fs.readFileSync(LEGACY_PENDING_REQUESTS_FILE, 'utf8'));
-            Object.entries(legacyRequests).forEach(([requestId, payload]) => {
-                if (!payload || !payload.userId) return;
-                if (!store.users[payload.userId]) store.users[payload.userId] = {};
-                store.users[payload.userId].status = 'pending';
-                if (!store.users[payload.userId].lastRequest) {
-                    store.users[payload.userId].lastRequest = {
-                        segaId: payload.segaId || '',
-                        reason: payload.reason || ''
-                    };
-                }
-            });
-        } catch (e) {
-            console.error("Failed to load legacy pending requests:", e);
-        }
-    }
-
-    return store;
+    return { users: {} };
 }
 
 function saveStore(store) {

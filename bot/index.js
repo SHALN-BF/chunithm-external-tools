@@ -19,7 +19,6 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const userManager = require('./userManager');
 const browserHandler = require('./browserHandler');
-const crypto = require('crypto');
 
 const parseIdList = (value) => (value || '')
     .split(',')
@@ -483,7 +482,7 @@ const handleUsersCommand = async (interaction) => {
         content: [
             '**Allowed users (env):**',
             envList,
-            '\n**Approved users (approvals.json):**',
+            '\n**Approved users:**',
             approvedList,
             '\n**Pending users:**',
             pendingList,
