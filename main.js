@@ -1,5 +1,11 @@
 (async function () {
     'use strict';
+    console.log("[CHUNITHM] Script started.");
+
+    // Polyfill for console.log debugging
+    const log = (msg) => console.log(`[CHUNITHM] ${msg}`);
+    const error = (msg) => console.error(`[CHUNITHM ERROR] ${msg}`);
+
     const CONSTANTS = {
         VERSION: "X-VERSE-X",
         URLS: {
