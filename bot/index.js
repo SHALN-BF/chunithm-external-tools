@@ -32,6 +32,8 @@ if (process.env.REQUEST_WEBHOOK_URL) {
     requestWebhook = new WebhookClient({ url: process.env.REQUEST_WEBHOOK_URL });
 }
 
+const REQUEST_CHANNEL_ID = (process.env.REQUEST_CHANNEL_ID || '').trim();
+
 async function logToWebhook(message) {
     console.log(message); // Always log to console
     if (webhookLogger) {
@@ -63,10 +65,10 @@ async function sendImagesToWebhook(message, listBuffer, graphBuffer) {
     }
 }
 
-const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(u => u.trim()).filter(Boolean);
+const BOT_ADMIN = (process.env.BOT_ADMIN || '').split(',').map(u => u.trim()).filter(Boolean);
 const pendingRequests = new Map();
 
-const isAdminUser = (userId) => ADMIN_USER_IDS.includes(userId);
+const isAdminUser = (userId) => BOT_ADMIN.includes(userId);
 
 const buildRequestComponents = (requestId, disabled = false, decision = null) => {
     const approveLabel = decision === 'approved' ? 'Approved' : 'Approve';
@@ -87,6 +89,24 @@ const buildRequestComponents = (requestId, disabled = false, decision = null) =>
         .setDisabled(disabled);
 
     return [new ActionRowBuilder().addComponents(approveButton, rejectButton)];
+};
+
+const sendRequestMessage = async (payload) => {
+    if (REQUEST_CHANNEL_ID) {
+        const channel = await client.channels.fetch(REQUEST_CHANNEL_ID).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+            throw new Error('REQUEST_CHANNEL_ID is invalid or not a text channel.');
+        }
+        await channel.send(payload);
+        return;
+    }
+
+    if (requestWebhook) {
+        await requestWebhook.send(payload);
+        return;
+    }
+
+    throw new Error('Request destination is not configured.');
 };
 
 const client = new Client({
@@ -117,7 +137,24 @@ const baseCommands = [
                 .setRequired(false)),
     new SlashCommandBuilder()
         .setName('request')
-        .setDescription('Request access to use the bot.')
+        .setDescription('Request access to use the bot.'),
+    new SlashCommandBuilder()
+        .setName('users')
+        .setDescription('List approved users (admin only).'),
+    new SlashCommandBuilder()
+        .setName('user-add')
+        .setDescription('Add an approved user (admin only).')
+        .addUserOption(option =>
+            option.setName('user')
+                .setDescription('User to approve')
+                .setRequired(true)),
+    new SlashCommandBuilder()
+        .setName('user-remove')
+        .setDescription('Remove an approved user (admin only).')
+        .addUserOption(option =>
+            option.setName('user')
+                .setDescription('User to remove')
+                .setRequired(true))
 ];
 
 const withGuildPrefix = (cmd, prefix) => {
@@ -163,14 +200,6 @@ client.on(Events.InteractionCreate, async interaction => {
         const segaId = interaction.fields.getTextInputValue('sega_id').trim();
         const reason = interaction.fields.getTextInputValue('reason').trim();
 
-        if (!requestWebhook) {
-            await interaction.reply({
-                content: 'Request webhook is not configured. Please contact the admin.',
-                flags: MessageFlags.Ephemeral
-            });
-            return;
-        }
-
         const requestId = crypto.randomUUID();
         pendingRequests.set(requestId, {
             userId: interaction.user.id,
@@ -178,16 +207,24 @@ client.on(Events.InteractionCreate, async interaction => {
             reason
         });
 
-        await requestWebhook.send({
-            content: [
-                '📝 **Access request received**',
-                `User: <@${interaction.user.id}> (${interaction.user.id})`,
-                `SEGA ID: ${segaId || 'N/A'}`,
-                `Reason: ${reason}`
-            ].join('\n'),
-            username: 'Chunithm Bot Requests',
-            components: buildRequestComponents(requestId)
-        });
+        try {
+            await sendRequestMessage({
+                content: [
+                    '📝 **Access request received**',
+                    `User: <@${interaction.user.id}> (${interaction.user.id})`,
+                    `SEGA ID: ${segaId || 'N/A'}`,
+                    `Reason: ${reason}`
+                ].join('\n'),
+                username: 'Chunithm Bot Requests',
+                components: buildRequestComponents(requestId)
+            });
+        } catch (e) {
+            await interaction.reply({
+                content: `Request destination error: ${e.message}`,
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
 
         await interaction.reply({
             content: 'Your request has been submitted. You will be notified once it is reviewed.',
@@ -197,9 +234,10 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     if (interaction.isButton() && interaction.customId.startsWith('request:')) {
+        await interaction.deferUpdate();
         const [, action, requestId] = interaction.customId.split(':');
         if (!isAdminUser(interaction.user.id)) {
-            await interaction.reply({
+            await interaction.followUp({
                 content: 'You are not authorized to review requests.',
                 flags: MessageFlags.Ephemeral
             });
@@ -208,7 +246,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
         const requestData = pendingRequests.get(requestId);
         if (!requestData) {
-            await interaction.reply({
+            await interaction.followUp({
                 content: 'Request not found or already processed.',
                 flags: MessageFlags.Ephemeral
             });
@@ -226,14 +264,14 @@ client.on(Events.InteractionCreate, async interaction => {
             const user = await client.users.fetch(requestData.userId);
             await user.send(
                 approved
-                    ? '✅ Your access request has been approved. You can now use the bot.'
+                    ? '✅ Your access request has been approved. You can now use the bot.\n use /register to set up your credentials.'
                     : '❌ Your access request has been rejected.'
             );
         } catch (e) {
             console.warn('Failed to DM user about request decision:', e.message);
         }
 
-        await interaction.update({
+        await interaction.editReply({
             content: [
                 interaction.message.content,
                 `\n**Decision:** ${approved ? 'Approved ✅' : 'Rejected ❌'} (by <@${interaction.user.id}>)`
@@ -362,6 +400,74 @@ client.on(Events.InteractionCreate, async interaction => {
         );
 
         await interaction.showModal(modal);
+    } else if (commandName === 'users') {
+        if (!isAdminUser(interaction.user.id)) {
+            await interaction.reply({
+                content: 'You are not authorized to manage users.',
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+
+        const { envUsers, approvedUsers } = userManager.getAllowedUsers();
+        const envList = envUsers.length > 0
+            ? envUsers.map(id => `<@${id}> (${id})`).join('\n')
+            : 'None';
+        const approvedList = approvedUsers.length > 0
+            ? approvedUsers.map(id => `<@${id}> (${id})`).join('\n')
+            : 'None';
+
+        await interaction.reply({
+            content: [
+                '**Allowed users (env):**',
+                envList,
+                '\n**Approved users (approvals.json):**',
+                approvedList
+            ].join('\n'),
+            flags: MessageFlags.Ephemeral
+        });
+    } else if (commandName === 'user-add') {
+        if (!isAdminUser(interaction.user.id)) {
+            await interaction.reply({
+                content: 'You are not authorized to manage users.',
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+
+        const target = interaction.options.getUser('user');
+        userManager.addApprovedUser(target.id);
+
+        await interaction.reply({
+            content: `✅ Approved <@${target.id}> (${target.id}).`,
+            flags: MessageFlags.Ephemeral
+        });
+    } else if (commandName === 'user-remove') {
+        if (!isAdminUser(interaction.user.id)) {
+            await interaction.reply({
+                content: 'You are not authorized to manage users.',
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+
+        const target = interaction.options.getUser('user');
+        const { envUsers } = userManager.getAllowedUsers();
+        if (envUsers.includes(target.id)) {
+            await interaction.reply({
+                content: `⚠️ <@${target.id}> is allowed via env and cannot be removed here.`,
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+
+        const removed = userManager.removeApprovedUser(target.id);
+        await interaction.reply({
+            content: removed
+                ? `🗑️ Removed <@${target.id}> (${target.id}).`
+                : `No entry found for <@${target.id}> (${target.id}).`,
+            flags: MessageFlags.Ephemeral
+        });
     }
 });
 

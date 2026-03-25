@@ -77,6 +77,25 @@ function addApprovedUser(userId) {
     }
 }
 
+function removeApprovedUser(userId) {
+    const approvals = loadApprovals();
+    const next = approvals.approvedUsers.filter(id => id !== userId);
+    const removed = next.length !== approvals.approvedUsers.length;
+    if (removed) {
+        approvals.approvedUsers = next;
+        saveApprovals(approvals);
+    }
+    return removed;
+}
+
+function getAllowedUsers() {
+    const approvals = loadApprovals();
+    return {
+        envUsers: ALLOWED_USERS.filter(Boolean),
+        approvedUsers: approvals.approvedUsers
+    };
+}
+
 function registerUser(userId, segaId, password) {
     if (!isUserAllowed(userId)) {
         throw new Error("User not authorized to use this bot.");
@@ -107,5 +126,7 @@ module.exports = {
     isUserAllowed,
     registerUser,
     getCredentials,
-    addApprovedUser
+    addApprovedUser,
+    removeApprovedUser,
+    getAllowedUsers
 };
