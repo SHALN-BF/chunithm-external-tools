@@ -3,8 +3,10 @@ const path = require('path');
 const crypto = require('crypto');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-const USER_DATA_FILE = path.join(__dirname, 'userData.json');
-const APPROVALS_FILE = path.join(__dirname, 'approvals.json');
+const USERS_FILE = path.join(__dirname, 'users.json');
+const LEGACY_USER_DATA_FILE = path.join(__dirname, 'userData.json');
+const LEGACY_APPROVALS_FILE = path.join(__dirname, 'approvals.json');
+const LEGACY_PENDING_REQUESTS_FILE = path.join(__dirname, 'pendingRequests.json');
 const ALLOWED_USERS = (process.env.ALLOWED_USERS || '').split(',').map(u => u.trim());
 
 // Encryption settings
@@ -31,68 +33,109 @@ function decrypt(text) {
     return decrypted;
 }
 
-function loadData() {
-    if (!fs.existsSync(USER_DATA_FILE)) {
-        return {};
+function loadStore() {
+    if (fs.existsSync(USERS_FILE)) {
+        try {
+            return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+        } catch (e) {
+            console.error("Failed to load users store:", e);
+        }
     }
-    try {
-        return JSON.parse(fs.readFileSync(USER_DATA_FILE, 'utf8'));
-    } catch (e) {
-        console.error("Failed to load user data:", e);
-        return {};
+
+    const store = { users: {} };
+
+    if (fs.existsSync(LEGACY_APPROVALS_FILE)) {
+        try {
+            const legacyApprovals = JSON.parse(fs.readFileSync(LEGACY_APPROVALS_FILE, 'utf8'));
+            (legacyApprovals.approvedUsers || []).forEach(userId => {
+                if (!store.users[userId]) store.users[userId] = {};
+                store.users[userId].status = 'approved';
+            });
+        } catch (e) {
+            console.error("Failed to load legacy approvals:", e);
+        }
     }
+
+    if (fs.existsSync(LEGACY_USER_DATA_FILE)) {
+        try {
+            const legacyData = JSON.parse(fs.readFileSync(LEGACY_USER_DATA_FILE, 'utf8'));
+            Object.entries(legacyData).forEach(([userId, data]) => {
+                if (!store.users[userId]) store.users[userId] = {};
+                store.users[userId].credentials = {
+                    segaId: data.segaId,
+                    password: data.password
+                };
+            });
+        } catch (e) {
+            console.error("Failed to load legacy user data:", e);
+        }
+    }
+
+    if (fs.existsSync(LEGACY_PENDING_REQUESTS_FILE)) {
+        try {
+            const legacyRequests = JSON.parse(fs.readFileSync(LEGACY_PENDING_REQUESTS_FILE, 'utf8'));
+            Object.entries(legacyRequests).forEach(([requestId, payload]) => {
+                if (!payload || !payload.userId) return;
+                if (!store.users[payload.userId]) store.users[payload.userId] = {};
+                store.users[payload.userId].status = 'pending';
+                if (!store.users[payload.userId].lastRequest) {
+                    store.users[payload.userId].lastRequest = {
+                        segaId: payload.segaId || '',
+                        reason: payload.reason || ''
+                    };
+                }
+            });
+        } catch (e) {
+            console.error("Failed to load legacy pending requests:", e);
+        }
+    }
+
+    return store;
 }
 
-function loadApprovals() {
-    if (!fs.existsSync(APPROVALS_FILE)) {
-        return { approvedUsers: [] };
-    }
-    try {
-        return JSON.parse(fs.readFileSync(APPROVALS_FILE, 'utf8'));
-    } catch (e) {
-        console.error("Failed to load approvals:", e);
-        return { approvedUsers: [] };
-    }
-}
-
-function saveApprovals(data) {
-    fs.writeFileSync(APPROVALS_FILE, JSON.stringify(data, null, 2));
-}
-
-function saveData(data) {
-    fs.writeFileSync(USER_DATA_FILE, JSON.stringify(data, null, 2));
+function saveStore(store) {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(store, null, 2));
 }
 
 function isUserAllowed(userId) {
     if (ALLOWED_USERS.includes(userId)) return true;
-    const approvals = loadApprovals();
-    return approvals.approvedUsers.includes(userId);
+    const store = loadStore();
+    return store.users?.[userId]?.status === 'approved';
 }
 
 function addApprovedUser(userId) {
-    const approvals = loadApprovals();
-    if (!approvals.approvedUsers.includes(userId)) {
-        approvals.approvedUsers.push(userId);
-        saveApprovals(approvals);
-    }
+    const store = loadStore();
+    if (!store.users[userId]) store.users[userId] = {};
+    store.users[userId].status = 'approved';
+    saveStore(store);
 }
 
 function removeApprovedUser(userId) {
-    const approvals = loadApprovals();
-    const next = approvals.approvedUsers.filter(id => id !== userId);
-    const removed = next.length !== approvals.approvedUsers.length;
-    if (removed) {
-        approvals.approvedUsers = next;
-        saveApprovals(approvals);
+    const store = loadStore();
+    if (!store.users[userId] || store.users[userId].status !== 'approved') {
+        return false;
     }
-    return removed;
+    store.users[userId].status = 'revoked';
+    saveStore(store);
+    return true;
 }
 
 function getAllowedUsers() {
-    const approvals = loadApprovals();
+    const store = loadStore();
+    const approvedUsers = Object.entries(store.users || {})
+        .filter(([, data]) => data.status === 'approved')
+        .map(([userId]) => userId);
+    const pendingUsers = Object.entries(store.users || {})
+        .filter(([, data]) => data.status === 'pending')
+        .map(([userId]) => userId);
+    const rejectedUsers = Object.entries(store.users || {})
+        .filter(([, data]) => data.status === 'rejected')
+        .map(([userId]) => userId);
     return {
         envUsers: ALLOWED_USERS.filter(Boolean),
-        approvedUsers: approvals.approvedUsers
+        approvedUsers,
+        pendingUsers,
+        rejectedUsers
     };
 }
 
@@ -100,25 +143,75 @@ function registerUser(userId, segaId, password) {
     if (!isUserAllowed(userId)) {
         throw new Error("User not authorized to use this bot.");
     }
-    const data = loadData();
-    data[userId] = {
+    const store = loadStore();
+    if (!store.users[userId]) store.users[userId] = {};
+    store.users[userId].credentials = {
         segaId: encrypt(segaId),
         password: encrypt(password)
     };
-    saveData(data);
+    saveStore(store);
 }
 
 function getCredentials(userId) {
     if (!isUserAllowed(userId)) {
         throw new Error("User not authorized.");
     }
-    const data = loadData();
-    const user = data[userId];
-    if (!user) return null;
+    const store = loadStore();
+    const user = store.users?.[userId];
+    if (!user || !user.credentials) return null;
 
     return {
-        segaId: decrypt(user.segaId),
-        password: decrypt(user.password)
+        segaId: decrypt(user.credentials.segaId),
+        password: decrypt(user.credentials.password)
+    };
+}
+
+function createAccessRequest(userId, segaId, reason) {
+    const store = loadStore();
+    if (!store.users[userId]) store.users[userId] = {};
+    store.users[userId].status = 'pending';
+    store.users[userId].lastRequest = { segaId, reason, createdAt: new Date().toISOString() };
+    saveStore(store);
+    return userId;
+}
+
+function getAccessRequest(requestId) {
+    const store = loadStore();
+    const user = store.users?.[requestId];
+    if (!user || user.status !== 'pending' || !user.lastRequest) return null;
+    return {
+        userId: requestId,
+        segaId: user.lastRequest.segaId || '',
+        reason: user.lastRequest.reason || '',
+        createdAt: user.lastRequest.createdAt || ''
+    };
+}
+
+function approveAccessRequest(requestId) {
+    const store = loadStore();
+    const user = store.users?.[requestId];
+    if (!user || user.status !== 'pending') return null;
+    store.users[requestId].status = 'approved';
+    saveStore(store);
+    return {
+        userId: requestId,
+        segaId: user.lastRequest?.segaId || '',
+        reason: user.lastRequest?.reason || '',
+        createdAt: user.lastRequest?.createdAt || ''
+    };
+}
+
+function rejectAccessRequest(requestId) {
+    const store = loadStore();
+    const user = store.users?.[requestId];
+    if (!user || user.status !== 'pending') return null;
+    store.users[requestId].status = 'rejected';
+    saveStore(store);
+    return {
+        userId: requestId,
+        segaId: user.lastRequest?.segaId || '',
+        reason: user.lastRequest?.reason || '',
+        createdAt: user.lastRequest?.createdAt || ''
     };
 }
 
@@ -128,5 +221,9 @@ module.exports = {
     getCredentials,
     addApprovedUser,
     removeApprovedUser,
-    getAllowedUsers
+    getAllowedUsers,
+    createAccessRequest,
+    getAccessRequest,
+    approveAccessRequest,
+    rejectAccessRequest
 };

@@ -22,10 +22,10 @@ This is a Discord bot that automates the generation of Chunithm Best Score image
     - `REQUEST_CHANNEL_ID`: Channel ID where access requests are posted (buttons enabled).
     - `REQUEST_WEBHOOK_URL`: Fallback request destination if no channel is configured.
     - `LOG_WEBHOOK_URL`: Optional webhook for log messages and full-score images.
-    - `GUILD_IDS`: Comma-separated list of guild IDs for registering `g-` prefixed commands.
     - `BOT_DELAY_MS`: Delay between requests in milliseconds (defaults to 1000ms). Internally converted to seconds.
     - `BOT_GENERATION_TIMEOUT_MS`: Generation timeout (paid/standard) in milliseconds (defaults to 180000ms).
     - `BOT_GENERATION_TIMEOUT_FREE_MS`: Generation timeout (free mode) in milliseconds (defaults to 900000ms).
+    - `BOT_PROTOCOL_TIMEOUT_MS`: Puppeteer protocol timeout override in milliseconds (defaults to the larger generation timeout).
 
 3.  **Run the Bot**:
     ```bash
@@ -41,16 +41,14 @@ This is a Discord bot that automates the generation of Chunithm Best Score image
 -   `/user-add [user]`: Approve a user manually (admin only).
 -   `/user-remove [user]`: Remove a user from approvals (admin only; env users cannot be removed here).
 
-If `GUILD_IDS` is set, guild commands are registered with a `g-` prefix (for example, `/g-best`, `/g-request`).
+
 
 ## Notes
 
 -   The bot uses a headless browser to log in to Chunithm-NET.
--   Credentials are stored in [userData.json](userData.json) encrypted with `aes-256-cbc`.
--   Approved users are stored in [approvals.json](approvals.json).
+-   Users, credentials, and request status are stored per-user in [users.json](users.json) (credentials are encrypted with `aes-256-cbc`).
 -   The generation process takes about 1-2 minutes per request.
 
 ## Example Files
 
--   [approvals.json.example](approvals.json.example)
--   [userData.json.example](userData.json.example)
+-   [users.json.example](users.json.example)

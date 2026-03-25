@@ -5,6 +5,17 @@ const path = require('path');
 const CHUNITHM_NET_URL = 'https://new.chunithm-net.com/';
 const PLAYER_DATA_URL = 'https://new.chunithm-net.com/chuni-mobile/html/mobile/home/playerData/';
 
+const resolveTimeoutValue = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const resolveGenerationTimeouts = () => {
+    const baseTimeoutMs = resolveTimeoutValue(process.env.BOT_GENERATION_TIMEOUT_MS, 180000);
+    const freeTimeoutMs = resolveTimeoutValue(process.env.BOT_GENERATION_TIMEOUT_FREE_MS, 900000);
+    return { baseTimeoutMs, freeTimeoutMs };
+};
+
 class BrowserHandler {
     constructor() {
         this.browser = null;
@@ -13,8 +24,21 @@ class BrowserHandler {
     async launchBrowser() {
         if (!this.browser) {
             console.log("Launching browser...");
+            const { baseTimeoutMs, freeTimeoutMs } = resolveGenerationTimeouts();
+            const protocolTimeoutEnvRaw = process.env.BOT_PROTOCOL_TIMEOUT_MS;
+            let protocolTimeout;
+            if (protocolTimeoutEnvRaw !== undefined) {
+                protocolTimeout = resolveTimeoutValue(protocolTimeoutEnvRaw, 180000);
+            } else {
+                if (baseTimeoutMs === 0 || freeTimeoutMs === 0) {
+                    protocolTimeout = 0;
+                } else {
+                    protocolTimeout = Math.max(180000, baseTimeoutMs, freeTimeoutMs);
+                }
+            }
             this.browser = await puppeteer.launch({
                 headless: "new",
+                protocolTimeout,
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -251,6 +275,12 @@ class BrowserHandler {
                 'window.generatedResult = { list: listDataUrl, graph: graphDataUrl };'
             );
 
+            // Capture any showError calls so we can fail fast instead of timing out.
+            mainJsContent = mainJsContent.replace(
+                /showError\(([^)]+)\);/g,
+                'window.generatedError = $1; showError($1);'
+            );
+
             // Verify replacements to prevent timeout debugging nightmares
             if (!mainJsContent.includes('window.mockAskForSettings')) {
                 throw new Error("Failed to inject 'window.mockAskForSettings' into main.js content.");
@@ -272,6 +302,8 @@ class BrowserHandler {
 
             await page.evaluate((settings) => {
                 window.__hideScore = Boolean(settings.hideScore);
+                window.generatedResult = null;
+                window.generatedError = null;
                 window.mockAskForSettings = async () => {
                     return {
                         delay: settings.delaySeconds,
@@ -317,20 +349,36 @@ class BrowserHandler {
                 throw e;
             }
 
-            const baseTimeoutMs = Number(process.env.BOT_GENERATION_TIMEOUT_MS ?? '180000');
-            const freeTimeoutMs = Number(process.env.BOT_GENERATION_TIMEOUT_FREE_MS ?? '900000');
+            const { baseTimeoutMs, freeTimeoutMs } = resolveGenerationTimeouts();
             const generationTimeoutMs = (effectiveScanMode === 'free')
-                ? (Number.isFinite(freeTimeoutMs) ? freeTimeoutMs : 900000)
-                : (Number.isFinite(baseTimeoutMs) ? baseTimeoutMs : 180000);
+                ? (freeTimeoutMs === 0 ? 0 : freeTimeoutMs)
+                : baseTimeoutMs;
 
-            console.log(`[${segaId}] Waiting for generation (can take 1-2 mins)...`);
+            const waitStart = Date.now();
+            page.setDefaultTimeout(generationTimeoutMs === 0 ? 0 : generationTimeoutMs);
+            page.setDefaultNavigationTimeout(generationTimeoutMs === 0 ? 0 : generationTimeoutMs);
+
+            console.log(`[${segaId}] Waiting for generation (mode=${effectiveScanMode}, timeoutMs=${generationTimeoutMs})...`);
             try {
-                await page.waitForFunction(() => window.generatedResult, { timeout: generationTimeoutMs });
+                await page.waitForFunction(
+                    () => window.generatedResult || window.generatedError,
+                    { timeout: generationTimeoutMs }
+                );
             } catch (e) {
-                throw new Error("Generation timed out.");
+                const elapsedMs = Date.now() - waitStart;
+                if (e && e.name === 'TimeoutError') {
+                    throw new Error(`Generation timed out after ${elapsedMs}ms.`);
+                }
+                throw new Error(`Generation failed after ${elapsedMs}ms: ${e?.message || e}`);
             }
 
-            const result = await page.evaluate(() => window.generatedResult);
+            const { result, error } = await page.evaluate(() => ({
+                result: window.generatedResult,
+                error: window.generatedError
+            }));
+            if (error) {
+                throw new Error(`Generation failed: ${error}`);
+            }
 
             console.log(`[${segaId}] Generation successful!`);
             return result;

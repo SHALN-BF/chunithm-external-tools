@@ -1150,6 +1150,30 @@
         return total / list.length;
     };
 
+    const buildFrameLists = (detailedOldSongs, detailedNewSongs, frameMode, includeNewInBest) => {
+        if (frameMode === 'best50') {
+            const sourceList = includeNewInBest
+                ? [...detailedOldSongs, ...detailedNewSongs]
+                : [...detailedOldSongs];
+            return {
+                best: sourceList.sort((a, b) => b.rating - a.rating).slice(0, 50),
+                recent: []
+            };
+        }
+
+        if (frameMode === 'bestOnly') {
+            return {
+                best: detailedOldSongs.slice(0, 30),
+                recent: []
+            };
+        }
+
+        return {
+            best: detailedOldSongs.slice(0, 30),
+            recent: detailedNewSongs.slice(0, 20)
+        };
+    };
+
     const generateImage = async (playerData, bestList, recentList) => {
         await ensureJapaneseFont();
 
@@ -1983,21 +2007,9 @@
             detailedNewSongs.sort((a, b) => b.rating - a.rating);
             detailedOldSongs.sort((a, b) => b.rating - a.rating);
 
-            if (frameMode === 'best50') {
-                const sourceList = includeNewInBest
-                    ? [...detailedOldSongs, ...detailedNewSongs]
-                    : [...detailedOldSongs];
-                finalBestList = sourceList
-                    .sort((a, b) => b.rating - a.rating)
-                    .slice(0, 50);
-                finalRecentList = [];
-            } else if (frameMode === 'bestOnly') {
-                finalBestList = detailedOldSongs.slice(0, 30);
-                finalRecentList = [];
-            } else {
-                finalBestList = detailedOldSongs.slice(0, 30);
-                finalRecentList = detailedNewSongs.slice(0, 20);
-            }
+            const frameLists = buildFrameLists(detailedOldSongs, detailedNewSongs, frameMode, includeNewInBest);
+            finalBestList = frameLists.best;
+            finalRecentList = frameLists.recent;
         }
 
         updateMessage('リスト画像を生成中...', 97);
