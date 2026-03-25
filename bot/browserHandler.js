@@ -33,7 +33,13 @@ class BrowserHandler {
     }
 
     async generateScoreImage(segaId, password, options = {}) {
-        const { hideScore = false } = options;
+        const {
+            hideScore = false,
+            scanMode = null,
+            bestConstThreshold = null,
+            newConstThreshold = null,
+            bestOnly = false
+        } = options;
         if (!this.browser) await this.launchBrowser();
 
         const context = await this.browser.createBrowserContext();
@@ -63,6 +69,7 @@ class BrowserHandler {
         });
 
         try {
+            let isStandardCourse = null;
             console.log(`[${segaId}] Navigating to login page...`);
             await page.goto(CHUNITHM_NET_URL, { waitUntil: 'networkidle2' });
 
@@ -175,11 +182,13 @@ class BrowserHandler {
 
                 if (courseText.includes('スタンダードコース') || courseText.includes('Standard Course')) {
                     console.log(`[${segaId}] Standard course confirmed.`);
+                    isStandardCourse = true;
                 } else {
                     console.log(`[${segaId}] Warning: Standard course NOT detected. Text: ${courseText}`);
                     // You might want to throw here if standard course is strictly required, 
                     // but sometimes users might just want free features if possible. 
                     // For this specific tool, let's proceed but warn.
+                    isStandardCourse = false;
                 }
 
                 const selectBtn = await page.$('.btn_select_aime');
@@ -252,16 +261,25 @@ class BrowserHandler {
 
             // Also replace createOverlay logic or handle it via injecting a div beforehand.
 
-            await page.evaluate((hideScoreFlag) => {
-                window.__hideScore = Boolean(hideScoreFlag);
+            const effectiveScanMode = (scanMode === 'free' || scanMode === 'paid')
+                ? scanMode
+                : (isStandardCourse === false ? 'free' : 'paid');
+
+            const delayMsRaw = Number(process.env.BOT_DELAY_MS ?? '1000');
+            const delaySeconds = Number.isFinite(delayMsRaw)
+                ? Math.max(0, delayMsRaw / 1000)
+                : 1;
+
+            await page.evaluate((settings) => {
+                window.__hideScore = Boolean(settings.hideScore);
                 window.mockAskForSettings = async () => {
                     return {
-                        delay: 1,
-                        scanMode: 'paid', // Use 'paid' for speed
-                        frameMode: 'withNew',
-                        bestConstThreshold: 0,
-                        newConstThreshold: 0,
-                        includeNewInBest: true
+                        delay: settings.delaySeconds,
+                        scanMode: settings.scanMode,
+                        frameMode: settings.frameMode,
+                        bestConstThreshold: settings.bestConstThreshold,
+                        newConstThreshold: settings.newConstThreshold,
+                        includeNewInBest: settings.includeNewInBest
                     };
                 };
 
@@ -270,7 +288,15 @@ class BrowserHandler {
                     o.id = 'overlay';
                     document.body.appendChild(o);
                 }
-            }, hideScore);
+            }, {
+                hideScore,
+                delaySeconds,
+                scanMode: effectiveScanMode,
+                frameMode: bestOnly ? 'bestOnly' : 'withNew',
+                bestConstThreshold: Number.isFinite(bestConstThreshold) ? bestConstThreshold : 14.5,
+                newConstThreshold: Number.isFinite(newConstThreshold) ? newConstThreshold : 13.5,
+                includeNewInBest: !bestOnly
+            });
 
             // We need to inject the function carefully.
             // mainJsContent is a raw string of source code which starts with (async function(){ ... })()

@@ -1991,6 +1991,9 @@
                     .sort((a, b) => b.rating - a.rating)
                     .slice(0, 50);
                 finalRecentList = [];
+            } else if (frameMode === 'bestOnly') {
+                finalBestList = detailedOldSongs.slice(0, 30);
+                finalRecentList = [];
             } else {
                 finalBestList = detailedOldSongs.slice(0, 30);
                 finalRecentList = detailedNewSongs.slice(0, 20);

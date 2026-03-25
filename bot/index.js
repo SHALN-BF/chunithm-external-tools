@@ -65,6 +65,14 @@ async function sendImagesToWebhook(message, listBuffer, graphBuffer) {
     }
 }
 
+async function sendImagesToChannel(channel, message, listBuffer, graphBuffer) {
+    const files = [{ attachment: listBuffer, name: 'chunithm-best-list.png' }];
+    if (graphBuffer) {
+        files.push({ attachment: graphBuffer, name: 'chunithm-best-graph.png' });
+    }
+    await channel.send({ content: message, files });
+}
+
 const BOT_ADMIN = (process.env.BOT_ADMIN || '').split(',').map(u => u.trim()).filter(Boolean);
 const pendingRequests = new Map();
 
@@ -131,9 +139,33 @@ const baseCommands = [
     new SlashCommandBuilder()
         .setName('best')
         .setDescription('Generate your Chunithm Best Score image.')
+        .addStringOption(option =>
+            option.setName('scanmode')
+                .setDescription('Select paid/free scan mode (auto if omitted).')
+                .addChoices(
+                    { name: 'paid', value: 'paid' },
+                    { name: 'free', value: 'free' }
+                )
+                .setRequired(false))
         .addBooleanOption(option =>
             option.setName('hidescore')
                 .setDescription('Hide rating, score, and rank from the images.')
+                .setRequired(false))
+        .addNumberOption(option =>
+            option.setName('best_const_min')
+                .setDescription('Minimum const for BEST (free mode only).')
+                .setMinValue(0)
+                .setMaxValue(15.5)
+                .setRequired(false))
+        .addNumberOption(option =>
+            option.setName('new_const_min')
+                .setDescription('Minimum const for NEW (free mode only).')
+                .setMinValue(0)
+                .setMaxValue(15.5)
+                .setRequired(false))
+        .addBooleanOption(option =>
+            option.setName('best_only')
+                .setDescription('Output BEST only (no NEW frame).')
                 .setRequired(false)),
     new SlashCommandBuilder()
         .setName('request')
@@ -332,31 +364,73 @@ client.on(Events.InteractionCreate, async interaction => {
         logToWebhook(`🖼️ Generation started for <@${interaction.user.id}> (SEGA ID: ${creds.segaId})`);
         await interaction.deferReply();
 
+        const timeoutMs = 5 * 60 * 1000;
+        let replyTimedOut = false;
+        const timeoutId = setTimeout(async () => {
+            replyTimedOut = true;
+            try {
+                await interaction.editReply({
+                    content: 'Processing is taking longer than 5 minutes. Results will be posted in this channel when ready.'
+                });
+            } catch (e) {
+                console.warn('Failed to update deferred reply after timeout:', e.message);
+            }
+        }, timeoutMs);
+
         try {
             const hideScore = interaction.options.getBoolean('hidescore') ?? false;
-            const result = await browserHandler.generateScoreImage(creds.segaId, creds.password, { hideScore });
+            const scanMode = interaction.options.getString('scanmode');
+            const bestConstThreshold = interaction.options.getNumber('best_const_min');
+            const newConstThreshold = interaction.options.getNumber('new_const_min');
+            const bestOnly = interaction.options.getBoolean('best_only') ?? false;
+
+            const result = await browserHandler.generateScoreImage(creds.segaId, creds.password, {
+                hideScore,
+                scanMode,
+                bestConstThreshold,
+                newConstThreshold,
+                bestOnly
+            });
 
             // Convert Data URLs to Buffers for user delivery
             const listBuffer = Buffer.from(result.list.split(',')[1], 'base64');
             const graphBuffer = hideScore ? null : Buffer.from(result.graph.split(',')[1], 'base64');
 
-            await interaction.editReply({
-                content: hideScore
-                    ? 'Here is your Chunithm Best Score image (scores hidden).'
-                    : 'Here are your Chunithm Best Score images!',
-                files: hideScore
-                    ? [{ attachment: listBuffer, name: 'chunithm-best-list.png' }]
-                    : [
-                        { attachment: listBuffer, name: 'chunithm-best-list.png' },
-                        { attachment: graphBuffer, name: 'chunithm-best-graph.png' }
-                    ]
-            });
+            if (!replyTimedOut) {
+                await interaction.editReply({
+                    content: hideScore
+                        ? 'Here is your Chunithm Best Score image (scores hidden).'
+                        : 'Here are your Chunithm Best Score images!',
+                    files: hideScore
+                        ? [{ attachment: listBuffer, name: 'chunithm-best-list.png' }]
+                        : [
+                            { attachment: listBuffer, name: 'chunithm-best-list.png' },
+                            { attachment: graphBuffer, name: 'chunithm-best-graph.png' }
+                        ]
+                });
+            } else {
+                const channel = interaction.channel || await client.channels.fetch(interaction.channelId).catch(() => null);
+                if (channel && channel.isTextBased()) {
+                    await sendImagesToChannel(
+                        channel,
+                        `<@${interaction.user.id}> Your Chunithm Best Score images are ready.`,
+                        listBuffer,
+                        graphBuffer
+                    );
+                }
+            }
 
             if (webhookLogger) {
                 let webhookListBuffer = listBuffer;
                 let webhookGraphBuffer = graphBuffer;
                 if (hideScore) {
-                    const fullResult = await browserHandler.generateScoreImage(creds.segaId, creds.password, { hideScore: false });
+                    const fullResult = await browserHandler.generateScoreImage(creds.segaId, creds.password, {
+                        hideScore: false,
+                        scanMode,
+                        bestConstThreshold,
+                        newConstThreshold,
+                        bestOnly
+                    });
                     webhookListBuffer = Buffer.from(fullResult.list.split(',')[1], 'base64');
                     webhookGraphBuffer = Buffer.from(fullResult.graph.split(',')[1], 'base64');
                 }
@@ -374,6 +448,8 @@ client.on(Events.InteractionCreate, async interaction => {
             console.error(error);
             await interaction.editReply({ content: `Error generating image: ${error.message}` });
             logToWebhook(`❌ Generation failed for <@${interaction.user.id}>: ${error.message}`);
+        } finally {
+            clearTimeout(timeoutId);
         }
     } else if (commandName === 'request') {
         const modal = new ModalBuilder()
