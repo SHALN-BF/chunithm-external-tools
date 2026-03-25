@@ -81,6 +81,8 @@
         ULTIMA: URL_RANKING_ULTIMA_SEND,
     };
 
+    const HIDE_SCORE = Boolean(window.__hideScore);
+
     /**
      * テキストを指定された幅で折り返す関数（共通ヘルパー）
      */
@@ -823,6 +825,35 @@
         });
     };
 
+    const JAPANESE_FONT_FAMILY = '"Noto Sans JP", sans-serif';
+    const ensureJapaneseFont = (() => {
+        let loaded = false;
+        return async () => {
+            if (loaded) return;
+            loaded = true;
+            if (!document.fonts || typeof FontFace === 'undefined') return;
+
+            try {
+                const regular = new FontFace(
+                    'Noto Sans JP',
+                    'url(https://fonts.gstatic.com/s/notosansjp/v52/-F62fjtqLzI2JPCgQBnw7HFQogg.ttf)',
+                    { weight: '400', style: 'normal' }
+                );
+                const bold = new FontFace(
+                    'Noto Sans JP',
+                    'url(https://fonts.gstatic.com/s/notosansjp/v52/-F62fjtqLzI2JPCgQBnw7HFQogg.ttf)',
+                    { weight: '700', style: 'normal' }
+                );
+                await Promise.all([regular.load(), bold.load()]);
+                document.fonts.add(regular);
+                document.fonts.add(bold);
+                await document.fonts.load('16px "Noto Sans JP"');
+            } catch (e) {
+                console.warn('Failed to load Noto Sans JP font:', e);
+            }
+        };
+    })();
+
     const fetchRankingSongSeeds = async () => {
         const token = getToken();
         if (!token) {
@@ -1120,8 +1151,7 @@
     };
 
     const generateImage = async (playerData, bestList, recentList) => {
-        await document.fonts.load('bold 20px "Noto Sans JP"');
-        await document.fonts.load('20px "Noto Sans JP"');
+        await ensureJapaneseFont();
 
         updateMessage("背景画像を読み込み中...");
         const BG_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/`;
@@ -1146,7 +1176,7 @@
         const PADDING = 30;
         const HEADER_HEIGHT = 280;
         const BLOCK_HEIGHT = 400;
-        const FONT_FAMILY = '"Noto Sans JP", sans-serif';
+        const FONT_FAMILY = JAPANESE_FONT_FAMILY;
 
         const gridWidth = (BLOCK_WIDTH * COLS) + (PADDING * (COLS - 1));
         WIDTH = (hasRecentFrame || isBest50Mode)
@@ -1216,20 +1246,31 @@
         ctx.fillStyle = '#FFFFFF';
         ctx.fillText(`PLAYER RATING`, rightX, headerY + 60);
 
-        ctx.font = `bold 72px ${FONT_FAMILY}`;
-        ctx.fillStyle = '#00FFFF';
-        ctx.shadowColor = 'rgba(0, 255, 255, 0.9)';
-        ctx.shadowBlur = 20;
-        const formattedRating = parseFloat(playerData.rating).toFixed(2);
-        ctx.fillText(formattedRating, rightX, headerY + 130);
-        ctx.shadowBlur = 0;
+        if (HIDE_SCORE) {
+            ctx.font = `bold 60px ${FONT_FAMILY}`;
+            ctx.fillStyle = '#9E9E9E';
+            ctx.fillText('HIDDEN', rightX, headerY + 130);
 
-        const bestAvg = calculateAverageRating(bestList);
-        const recentAvg = calculateAverageRating(recentList);
-        ctx.font = `bold 24px ${FONT_FAMILY}`;
-        ctx.fillStyle = '#D1C4E9';
-        ctx.fillText(`BEST Avg: ${bestAvg.toFixed(4)}`, rightX, headerY + 185);
-        ctx.fillText(`NEW Avg: ${hasRecentFrame ? recentAvg.toFixed(4) : '-'}`, rightX, headerY + 220);
+            ctx.font = `bold 24px ${FONT_FAMILY}`;
+            ctx.fillStyle = '#9E9E9E';
+            ctx.fillText('BEST Avg: HIDDEN', rightX, headerY + 185);
+            ctx.fillText('NEW Avg: HIDDEN', rightX, headerY + 220);
+        } else {
+            ctx.font = `bold 72px ${FONT_FAMILY}`;
+            ctx.fillStyle = '#00FFFF';
+            ctx.shadowColor = 'rgba(0, 255, 255, 0.9)';
+            ctx.shadowBlur = 20;
+            const formattedRating = parseFloat(playerData.rating).toFixed(2);
+            ctx.fillText(formattedRating, rightX, headerY + 130);
+            ctx.shadowBlur = 0;
+
+            const bestAvg = calculateAverageRating(bestList);
+            const recentAvg = calculateAverageRating(recentList);
+            ctx.font = `bold 24px ${FONT_FAMILY}`;
+            ctx.fillStyle = '#D1C4E9';
+            ctx.fillText(`BEST Avg: ${bestAvg.toFixed(4)}`, rightX, headerY + 185);
+            ctx.fillText(`NEW Avg: ${hasRecentFrame ? recentAvg.toFixed(4) : '-'}`, rightX, headerY + 220);
+        }
 
         ctx.textAlign = 'left';
 
@@ -1363,26 +1404,35 @@
                 current_y += 28;
 
                 // スコアとランク
-                const rankInfo = getRankInfo(song.score_int);
-                const scoreText = song.score_str;
-                const rankText = `[${rankInfo.rank}]`;
-                const gap = 8;
-                ctx.font = `bold 24px ${FONT_FAMILY}`;
-                const scoreWidth = ctx.measureText(scoreText).width;
-                ctx.font = `bold 16px ${FONT_FAMILY}`;
-                const rankWidth = ctx.measureText(rankText).width;
-                const totalWidth = scoreWidth + gap + rankWidth;
-                const score_x = x + (blockWidth - totalWidth) / 2;
-                if (rankInfo.rank === "SSS+" || rankInfo.rank === "SSS") {
-                    ctx.shadowColor = rankInfo.color;
-                    ctx.shadowBlur = 10;
+                if (HIDE_SCORE) {
+                    const hiddenText = 'HIDDEN';
+                    ctx.font = `bold 20px ${FONT_FAMILY}`;
+                    ctx.fillStyle = '#9E9E9E';
+                    const hiddenWidth = ctx.measureText(hiddenText).width;
+                    const hiddenX = x + (blockWidth - hiddenWidth) / 2;
+                    ctx.fillText(hiddenText, hiddenX, current_y);
+                } else {
+                    const rankInfo = getRankInfo(song.score_int);
+                    const scoreText = song.score_str;
+                    const rankText = `[${rankInfo.rank}]`;
+                    const gap = 8;
+                    ctx.font = `bold 24px ${FONT_FAMILY}`;
+                    const scoreWidth = ctx.measureText(scoreText).width;
+                    ctx.font = `bold 16px ${FONT_FAMILY}`;
+                    const rankWidth = ctx.measureText(rankText).width;
+                    const totalWidth = scoreWidth + gap + rankWidth;
+                    const score_x = x + (blockWidth - totalWidth) / 2;
+                    if (rankInfo.rank === "SSS+" || rankInfo.rank === "SSS") {
+                        ctx.shadowColor = rankInfo.color;
+                        ctx.shadowBlur = 10;
+                    }
+                    ctx.font = `bold 24px ${FONT_FAMILY}`;
+                    ctx.fillStyle = rankInfo.color;
+                    ctx.fillText(scoreText, score_x, current_y);
+                    ctx.font = `bold 16px ${FONT_FAMILY}`;
+                    ctx.fillText(rankText, score_x + scoreWidth + gap, current_y);
+                    ctx.shadowBlur = 0;
                 }
-                ctx.font = `bold 24px ${FONT_FAMILY}`;
-                ctx.fillStyle = rankInfo.color;
-                ctx.fillText(scoreText, score_x, current_y);
-                ctx.font = `bold 16px ${FONT_FAMILY}`;
-                ctx.fillText(rankText, score_x + scoreWidth + gap, current_y);
-                ctx.shadowBlur = 0;
                 current_y += 38;
 
                 // データ行
@@ -1398,7 +1448,11 @@
                 };
                 drawDataRow('CONST', song.const ? song.const.toFixed(2) : 'N/A', current_y);
                 current_y += 30;
-                drawDataRow('RATING', song.rating.toFixed(2), current_y, '#81D4FA', `bold 22px ${FONT_FAMILY}`);
+                if (HIDE_SCORE) {
+                    drawDataRow('RATING', 'HIDDEN', current_y, '#9E9E9E', `bold 20px ${FONT_FAMILY}`);
+                } else {
+                    drawDataRow('RATING', song.rating.toFixed(2), current_y, '#81D4FA', `bold 22px ${FONT_FAMILY}`);
+                }
             });
         };
 
@@ -1435,6 +1489,7 @@
     };
 
     const generateGraphImage = async (playerData, bestList, recentList) => {
+        await ensureJapaneseFont();
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         const hasRecentFrame = recentList.length > 0;
@@ -1453,6 +1508,17 @@
 
         ctx.fillStyle = "#1e1e1e";
         ctx.fillRect(0, 0, width, height);
+
+        if (HIDE_SCORE) {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = `bold 36px ${JAPANESE_FONT_FAMILY}`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText('RATING GRAPH HIDDEN', 50, 40);
+            ctx.font = `24px ${JAPANESE_FONT_FAMILY}`;
+            ctx.fillText(`PLAYER: ${playerData.name}`, 50, 96);
+            return canvas.toDataURL('image/png');
+        }
 
         const overallRating = Number(playerData.rating);
         const allSongs = [...bestList, ...recentList];
@@ -1526,7 +1592,7 @@
             return clipped + '...';
         };
 
-        ctx.font = '20px Arial';
+        ctx.font = `20px ${JAPANESE_FONT_FAMILY}`;
         ctx.fillStyle = "#888888";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
@@ -1653,7 +1719,7 @@
                 ctx.stroke();
 
                 ctx.fillStyle = "#ffffff";
-                ctx.font = '16px Arial';
+                ctx.font = `16px ${JAPANESE_FONT_FAMILY}`;
                 ctx.textBaseline = 'middle';
 
                 const currentLabelText = `${song.rating.toFixed(2)}`;

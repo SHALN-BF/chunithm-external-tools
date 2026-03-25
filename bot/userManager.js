@@ -4,6 +4,7 @@ const crypto = require('crypto');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const USER_DATA_FILE = path.join(__dirname, 'userData.json');
+const APPROVALS_FILE = path.join(__dirname, 'approvals.json');
 const ALLOWED_USERS = (process.env.ALLOWED_USERS || '').split(',').map(u => u.trim());
 
 // Encryption settings
@@ -42,12 +43,38 @@ function loadData() {
     }
 }
 
+function loadApprovals() {
+    if (!fs.existsSync(APPROVALS_FILE)) {
+        return { approvedUsers: [] };
+    }
+    try {
+        return JSON.parse(fs.readFileSync(APPROVALS_FILE, 'utf8'));
+    } catch (e) {
+        console.error("Failed to load approvals:", e);
+        return { approvedUsers: [] };
+    }
+}
+
+function saveApprovals(data) {
+    fs.writeFileSync(APPROVALS_FILE, JSON.stringify(data, null, 2));
+}
+
 function saveData(data) {
     fs.writeFileSync(USER_DATA_FILE, JSON.stringify(data, null, 2));
 }
 
 function isUserAllowed(userId) {
-    return ALLOWED_USERS.includes(userId);
+    if (ALLOWED_USERS.includes(userId)) return true;
+    const approvals = loadApprovals();
+    return approvals.approvedUsers.includes(userId);
+}
+
+function addApprovedUser(userId) {
+    const approvals = loadApprovals();
+    if (!approvals.approvedUsers.includes(userId)) {
+        approvals.approvedUsers.push(userId);
+        saveApprovals(approvals);
+    }
 }
 
 function registerUser(userId, segaId, password) {
@@ -79,5 +106,6 @@ function getCredentials(userId) {
 module.exports = {
     isUserAllowed,
     registerUser,
-    getCredentials
+    getCredentials,
+    addApprovedUser
 };

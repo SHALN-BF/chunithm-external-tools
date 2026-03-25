@@ -32,7 +32,8 @@ class BrowserHandler {
         }
     }
 
-    async generateScoreImage(segaId, password) {
+    async generateScoreImage(segaId, password, options = {}) {
+        const { hideScore = false } = options;
         if (!this.browser) await this.launchBrowser();
 
         const context = await this.browser.createBrowserContext();
@@ -66,8 +67,6 @@ class BrowserHandler {
             await page.goto(CHUNITHM_NET_URL, { waitUntil: 'networkidle2' });
 
             // Step 1: Debug snapshot after loading top page
-            await page.screenshot({ path: 'debug_step1_top.png' });
-            fs.writeFileSync('debug_step1_top.html', await page.content());
             console.log(`[${segaId}] Step 1: Loaded top page. URL: ${page.url()}`);
 
             if (page.url().includes('home')) {
@@ -137,9 +136,6 @@ class BrowserHandler {
 
                 // Step 2: Debug snapshot before looking for form
 
-                // Step 2: Debug snapshot before looking for form
-                await page.screenshot({ path: 'debug_step2_login_attempt.png' });
-                fs.writeFileSync('debug_step2_login_attempt.html', await page.content());
                 console.log(`[${segaId}] Step 2: On potential login page. URL: ${page.url()}`);
 
                 try {
@@ -163,8 +159,6 @@ class BrowserHandler {
                     ]);
 
                     // Step 3: Debug snapshot after login submission
-                    await page.screenshot({ path: 'debug_step3_after_login.png' });
-                    fs.writeFileSync('debug_step3_after_login.html', await page.content());
                     console.log(`[${segaId}] Step 3: Submitted login form. URL: ${page.url()}`);
                 } else {
                     throw new Error("Submit button not found on login page.");
@@ -258,10 +252,11 @@ class BrowserHandler {
 
             // Also replace createOverlay logic or handle it via injecting a div beforehand.
 
-            await page.evaluate(() => {
+            await page.evaluate((hideScoreFlag) => {
+                window.__hideScore = Boolean(hideScoreFlag);
                 window.mockAskForSettings = async () => {
                     return {
-                        delay: 1000,
+                        delay: 1,
                         scanMode: 'paid', // Use 'paid' for speed
                         frameMode: 'withNew',
                         bestConstThreshold: 0,
@@ -275,7 +270,7 @@ class BrowserHandler {
                     o.id = 'overlay';
                     document.body.appendChild(o);
                 }
-            });
+            }, hideScore);
 
             // We need to inject the function carefully.
             // mainJsContent is a raw string of source code which starts with (async function(){ ... })()

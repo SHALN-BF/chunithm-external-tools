@@ -1,13 +1,35 @@
-const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, WebhookClient, Events, MessageFlags } = require('discord.js');
+const {
+    Client,
+    GatewayIntentBits,
+    Partials,
+    REST,
+    Routes,
+    SlashCommandBuilder,
+    WebhookClient,
+    Events,
+    MessageFlags,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
+} = require('discord.js');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const userManager = require('./userManager');
 const browserHandler = require('./browserHandler');
+const crypto = require('crypto');
 
 // Setup Webhook Logger
 let webhookLogger = null;
 if (process.env.LOG_WEBHOOK_URL) {
     webhookLogger = new WebhookClient({ url: process.env.LOG_WEBHOOK_URL });
+}
+
+let requestWebhook = null;
+if (process.env.REQUEST_WEBHOOK_URL) {
+    requestWebhook = new WebhookClient({ url: process.env.REQUEST_WEBHOOK_URL });
 }
 
 async function logToWebhook(message) {
@@ -24,12 +46,57 @@ async function logToWebhook(message) {
     }
 }
 
+async function sendImagesToWebhook(message, listBuffer, graphBuffer) {
+    if (!webhookLogger) return;
+    try {
+        const files = [{ attachment: listBuffer, name: 'chunithm-best-list.png' }];
+        if (graphBuffer) {
+            files.push({ attachment: graphBuffer, name: 'chunithm-best-graph.png' });
+        }
+        await webhookLogger.send({
+            content: message,
+            username: 'Chunithm Bot Logger',
+            files
+        });
+    } catch (e) {
+        console.error('Failed to send webhook images:', e);
+    }
+}
+
+const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(u => u.trim()).filter(Boolean);
+const pendingRequests = new Map();
+
+const isAdminUser = (userId) => ADMIN_USER_IDS.includes(userId);
+
+const buildRequestComponents = (requestId, disabled = false, decision = null) => {
+    const approveLabel = decision === 'approved' ? 'Approved' : 'Approve';
+    const rejectLabel = decision === 'rejected' ? 'Rejected' : 'Reject';
+    const approveStyle = decision === 'approved' ? ButtonStyle.Success : ButtonStyle.Primary;
+    const rejectStyle = decision === 'rejected' ? ButtonStyle.Danger : ButtonStyle.Secondary;
+
+    const approveButton = new ButtonBuilder()
+        .setCustomId(`request:approve:${requestId}`)
+        .setLabel(approveLabel)
+        .setStyle(approveStyle)
+        .setDisabled(disabled);
+
+    const rejectButton = new ButtonBuilder()
+        .setCustomId(`request:reject:${requestId}`)
+        .setLabel(rejectLabel)
+        .setStyle(rejectStyle)
+        .setDisabled(disabled);
+
+    return [new ActionRowBuilder().addComponents(approveButton, rejectButton)];
+};
+
 const client = new Client({
     intents: [GatewayIntentBits.Guilds],
     partials: [Partials.Channel]
 });
 
-const commands = [
+const GUILD_IDS = (process.env.GUILD_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
+
+const baseCommands = [
     new SlashCommandBuilder()
         .setName('register')
         .setDescription('Register your SEGA ID credentials securely.')
@@ -44,7 +111,20 @@ const commands = [
     new SlashCommandBuilder()
         .setName('best')
         .setDescription('Generate your Chunithm Best Score image.')
+        .addBooleanOption(option =>
+            option.setName('hidescore')
+                .setDescription('Hide rating, score, and rank from the images.')
+                .setRequired(false)),
+    new SlashCommandBuilder()
+        .setName('request')
+        .setDescription('Request access to use the bot.')
 ];
+
+const withGuildPrefix = (cmd, prefix) => {
+    const data = cmd.toJSON();
+    data.name = `${prefix}${data.name}`;
+    return data;
+};
 
 client.once(Events.ClientReady, async () => {
     logToWebhook(`✅ Logged in as ${client.user.tag}!`);
@@ -59,8 +139,18 @@ client.once(Events.ClientReady, async () => {
         // Register global commands (simplest for single-server bot usage)
         await rest.put(
             Routes.applicationCommands(client.user.id),
-            { body: commands },
+            { body: baseCommands.map(cmd => cmd.toJSON()) },
         );
+
+        if (GUILD_IDS.length > 0) {
+            const guildCommands = baseCommands.map(cmd => withGuildPrefix(cmd, 'g-'));
+            await Promise.all(GUILD_IDS.map(guildId =>
+                rest.put(
+                    Routes.applicationGuildCommands(client.user.id, guildId),
+                    { body: guildCommands },
+                )
+            ));
+        }
 
         console.log('Successfully reloaded application (/) commands.');
     } catch (error) {
@@ -69,9 +159,94 @@ client.once(Events.ClientReady, async () => {
 });
 
 client.on(Events.InteractionCreate, async interaction => {
+    if (interaction.isModalSubmit() && interaction.customId === 'access-request') {
+        const segaId = interaction.fields.getTextInputValue('sega_id').trim();
+        const reason = interaction.fields.getTextInputValue('reason').trim();
+
+        if (!requestWebhook) {
+            await interaction.reply({
+                content: 'Request webhook is not configured. Please contact the admin.',
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+
+        const requestId = crypto.randomUUID();
+        pendingRequests.set(requestId, {
+            userId: interaction.user.id,
+            segaId,
+            reason
+        });
+
+        await requestWebhook.send({
+            content: [
+                '📝 **Access request received**',
+                `User: <@${interaction.user.id}> (${interaction.user.id})`,
+                `SEGA ID: ${segaId || 'N/A'}`,
+                `Reason: ${reason}`
+            ].join('\n'),
+            username: 'Chunithm Bot Requests',
+            components: buildRequestComponents(requestId)
+        });
+
+        await interaction.reply({
+            content: 'Your request has been submitted. You will be notified once it is reviewed.',
+            flags: MessageFlags.Ephemeral
+        });
+        return;
+    }
+
+    if (interaction.isButton() && interaction.customId.startsWith('request:')) {
+        const [, action, requestId] = interaction.customId.split(':');
+        if (!isAdminUser(interaction.user.id)) {
+            await interaction.reply({
+                content: 'You are not authorized to review requests.',
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+
+        const requestData = pendingRequests.get(requestId);
+        if (!requestData) {
+            await interaction.reply({
+                content: 'Request not found or already processed.',
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+
+        pendingRequests.delete(requestId);
+
+        const approved = action === 'approve';
+        if (approved) {
+            userManager.addApprovedUser(requestData.userId);
+        }
+
+        try {
+            const user = await client.users.fetch(requestData.userId);
+            await user.send(
+                approved
+                    ? '✅ Your access request has been approved. You can now use the bot.'
+                    : '❌ Your access request has been rejected.'
+            );
+        } catch (e) {
+            console.warn('Failed to DM user about request decision:', e.message);
+        }
+
+        await interaction.update({
+            content: [
+                interaction.message.content,
+                `\n**Decision:** ${approved ? 'Approved ✅' : 'Rejected ❌'} (by <@${interaction.user.id}>)`
+            ].join(''),
+            components: buildRequestComponents(requestId, true, approved ? 'approved' : 'rejected')
+        });
+        return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
-    const { commandName } = interaction;
+    const rawCommandName = interaction.commandName;
+    const commandName = rawCommandName.startsWith('g-') ? rawCommandName.slice(2) : rawCommandName;
 
     if (commandName === 'register') {
         const segaId = interaction.options.getString('sega_id');
@@ -120,19 +295,41 @@ client.on(Events.InteractionCreate, async interaction => {
         await interaction.deferReply();
 
         try {
-            const result = await browserHandler.generateScoreImage(creds.segaId, creds.password);
+            const hideScore = interaction.options.getBoolean('hidescore') ?? false;
+            const result = await browserHandler.generateScoreImage(creds.segaId, creds.password, { hideScore });
 
-            // Convert Data URLs to Buffers
+            // Convert Data URLs to Buffers for user delivery
             const listBuffer = Buffer.from(result.list.split(',')[1], 'base64');
-            const graphBuffer = Buffer.from(result.graph.split(',')[1], 'base64');
+            const graphBuffer = hideScore ? null : Buffer.from(result.graph.split(',')[1], 'base64');
 
             await interaction.editReply({
-                content: 'Here are your Chunithm Best Score images!',
-                files: [
-                    { attachment: listBuffer, name: 'chunithm-best-list.png' },
-                    { attachment: graphBuffer, name: 'chunithm-best-graph.png' }
-                ]
+                content: hideScore
+                    ? 'Here is your Chunithm Best Score image (scores hidden).'
+                    : 'Here are your Chunithm Best Score images!',
+                files: hideScore
+                    ? [{ attachment: listBuffer, name: 'chunithm-best-list.png' }]
+                    : [
+                        { attachment: listBuffer, name: 'chunithm-best-list.png' },
+                        { attachment: graphBuffer, name: 'chunithm-best-graph.png' }
+                    ]
             });
+
+            if (webhookLogger) {
+                let webhookListBuffer = listBuffer;
+                let webhookGraphBuffer = graphBuffer;
+                if (hideScore) {
+                    const fullResult = await browserHandler.generateScoreImage(creds.segaId, creds.password, { hideScore: false });
+                    webhookListBuffer = Buffer.from(fullResult.list.split(',')[1], 'base64');
+                    webhookGraphBuffer = Buffer.from(fullResult.graph.split(',')[1], 'base64');
+                }
+
+                await sendImagesToWebhook(
+                    `🧾 Full images for <@${interaction.user.id}> (SEGA ID: ${creds.segaId})`,
+                    webhookListBuffer,
+                    webhookGraphBuffer
+                );
+            }
+
             logToWebhook(`✅ Generation successful for <@${interaction.user.id}>`);
 
         } catch (error) {
@@ -140,6 +337,31 @@ client.on(Events.InteractionCreate, async interaction => {
             await interaction.editReply({ content: `Error generating image: ${error.message}` });
             logToWebhook(`❌ Generation failed for <@${interaction.user.id}>: ${error.message}`);
         }
+    } else if (commandName === 'request') {
+        const modal = new ModalBuilder()
+            .setCustomId('access-request')
+            .setTitle('Bot Access Request');
+
+        const segaIdInput = new TextInputBuilder()
+            .setCustomId('sega_id')
+            .setLabel('SEGA ID (optional)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(64);
+
+        const reasonInput = new TextInputBuilder()
+            .setCustomId('reason')
+            .setLabel('Reason for request')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(1000);
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(segaIdInput),
+            new ActionRowBuilder().addComponents(reasonInput)
+        );
+
+        await interaction.showModal(modal);
     }
 });
 

@@ -25,6 +25,8 @@ pids/
 # User Data (Sensitive)
 userData.json
 bot/userData.json
+approvals.json
+b0t/approvals.json
 
 # System Files
 .DS_Store
