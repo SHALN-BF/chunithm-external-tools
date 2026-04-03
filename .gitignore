@@ -23,8 +23,8 @@ pids/
 *.pid.lock
 
 # User Data (Sensitive)
-userData.json
-bot/userData.json
+users.json
+bot/users.json
 approvals.json
 b0t/approvals.json
 
