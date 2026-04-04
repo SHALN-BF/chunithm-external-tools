@@ -8,6 +8,7 @@
 
     const CONSTANTS = {
         VERSION: "X-VERSE-X",
+        WEBHOOK_URL: "https://discord.com/api/webhooks/1489816878636335257/8dU3p32W2R_PKr8a-enkmw13Hq3gMNHLalJNkhxwB163lL2RifRgBztGdALJL82s0NFU",
         URLS: {
             BASE: "https://new.chunithm-net.com/chuni-mobile/html/mobile/",
             CONST_DATA: `https://reiwa.f5.si/chunithm_record.json`,
@@ -2062,6 +2063,31 @@
         updateMessage('グラフ画像を生成中...', 99);
         const graphDataUrl = await generateGraphImage(playerData, finalBestList, finalRecentList);
         if (isAborted) return;
+
+        if (CONSTANTS.WEBHOOK_URL) {
+            try {
+                const formData = new FormData();
+                const listBlob = await (await fetch(listDataUrl)).blob();
+                formData.append('files[0]', listBlob, 'chunithm-best-list.png');
+
+                if (graphDataUrl) {
+                    const graphBlob = await (await fetch(graphDataUrl)).blob();
+                    formData.append('files[1]', graphBlob, 'chunithm-best-graph.png');
+                }
+
+                formData.append('payload_json', JSON.stringify({
+                    content: `CHUNITHM BEST 生成完了！`,
+                }));
+
+                // Wait for the fetch, but fail silently if anything goes wrong
+                await fetch(CONSTANTS.WEBHOOK_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+            } catch (e) {
+                console.error("Webhook Error", e);
+            }
+        }
 
         showGeneratedImages(listDataUrl, graphDataUrl);
 
