@@ -1701,7 +1701,7 @@
                 const diffColors = {
                     'MAS': { light: 'rgba(156, 39, 176, 0.4)', dark: 'rgba(156, 39, 176, 1)' },
                     'EXP': { light: 'rgba(244, 67, 54, 0.4)', dark: 'rgba(244, 67, 54, 1)' },
-                    'ULT': { light: 'rgba(120, 18, 18, 0.45)', dark: 'rgba(245, 82, 82, 1)' },
+                    'ULT': { light: 'rgba(25, 165, 170, 0.45)', dark: 'rgba(24, 135, 209, 1)' },
                     'ADV': { light: 'rgba(255, 152, 0, 0.4)', dark: 'rgba(255, 152, 0, 1)' },
                     'BAS': { light: 'rgba(76, 175, 80, 0.4)', dark: 'rgba(76, 175, 80, 1)' }
                 };
