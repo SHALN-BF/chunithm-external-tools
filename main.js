@@ -772,12 +772,9 @@
         } else if (score >= 1000000) {
             // SS: 譜面定数 + 1.0 + (100点毎に+0.01)
             r = constant + 1.00 + (score - 1000000) * 0.0001;
-        } else if (score >= 990000) {
-            // S+: 譜面定数 + 0.6 + (250点毎に+0.01)
-            r = constant + 0.60 + (score - 990000) * 0.00004;
         } else if (score >= 975000) {
-            // S: 譜面定数 + (975,000点を超えた分/25,000)
-            r = constant + (score - 975000) / 25000;
+            // S: 譜面定数 + (250点毎に+0.01)
+            r = constant + (score - 975000) * 0.00004;
         } else if (score >= 950000) {
             // AAA: 譜面定数 - 1.67 + (150点毎に+0.01)
             r = constant - 1.67 + (score - 950000) / 15000;
@@ -801,7 +798,8 @@
         }
 
         if (r < 0) r = 0;
-        const internal = Math.floor(r * 10000) / 10000;
+        // 浮動小数点演算の誤差により 16.65 * 10000 が 166499 になってしまうのを防ぐため、微小の値を足してから丸める
+        const internal = Math.floor(r * 10000 + 1e-6) / 10000;
         return Math.floor(internal * 100) / 100;
     };
 
