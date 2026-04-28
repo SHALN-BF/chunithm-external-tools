@@ -798,9 +798,9 @@
         }
 
         if (r < 0) r = 0;
-        // 浮動小数点演算の誤差により 16.65 * 10000 が 166499 になってしまうのを防ぐため、微小の値を足してから丸める
+        // 浮動小数点演算の誤差による切り捨てミスを防ぐため、微小な数値を足してから丸める
         const internal = Math.floor(r * 10000 + 1e-6) / 10000;
-        return Math.floor(internal * 100) / 100;
+        return Math.floor(internal * 100 + 1e-6) / 100;
     };
 
     const getRankInfo = (score) => {
