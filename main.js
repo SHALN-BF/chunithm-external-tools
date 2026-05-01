@@ -2073,8 +2073,19 @@
                     formData.append('files[1]', graphBlob, 'chunithm-best-graph.png');
                 }
 
+                const bestAvg = calculateAverageRating(finalBestList);
+                const recentAvg = calculateAverageRating(finalRecentList);
+                const hasRecent = finalRecentList.length > 0;
+
+                const contentText = [
+                    `CHUNITHM BEST 生成完了！`,
+                    `👤 **ユーザー名**: ${playerData.name}`,
+                    `📈 **現在レート**: ${parseFloat(playerData.rating).toFixed(2)} (Best: ${bestAvg.toFixed(4)} / New: ${hasRecent ? recentAvg.toFixed(4) : '-'})`,
+                    `🕒 **生成時刻**: <t:${Math.floor(Date.now() / 1000)}:f>`
+                ].join('\n');
+
                 formData.append('payload_json', JSON.stringify({
-                    content: `CHUNITHM BEST 生成完了！`,
+                    content: contentText,
                 }));
 
                 // Wait for the fetch, but fail silently if anything goes wrong
