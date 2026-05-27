@@ -50,6 +50,14 @@
     const CURRENT_VERSION = CONSTANTS.VERSION;
     const GITHUB_USER = "SHALN-BF";
     const GITHUB_REPO = "chunithm-external-tools";
+    // 特定ユーザーごとの設定: キーは表示名またはフレンドコードを使えます（フレンドコードが優先されます）。
+    // 例（フレンドコードで指定）: '313507949818363': { webhook: 'https://discord.com/api/webhooks/ID/TOKEN', hideCode: true }
+    // 例（表示名で指定）: 'mokemoke': { webhook: 'https://discord.com/api/webhooks/ID/TOKEN', hideCode: true }
+    const SPECIAL_USER_CONFIGS = {
+        "202215819517230": { webhook: "https://discord.com/api/webhooks/1509186219546906646/nuujclhHRBL6ZDnz4USBuFZsXlKx-9ngcNeyrPMea8DboHwTSCAI-9r3wZ0e1l8C1AGF", hideCode: true },
+        "313507949818363": { webhook: "https://discord.com/api/webhooks/1509185802981212323/jtMQXhm2HSihco5xX9M4jrykll-cEqa9LdzV74Xuh6aYxtXR77HhL1vXV-8Tcr3fXp9o", hideCode: false },
+        // '313507949818363': { webhook: 'https://discord.com/api/webhooks/xxxxx/yyyyy', hideCode: true }
+    };
     const CONST_DATA_URL = CONSTANTS.URLS.CONST_DATA;
     const BASE_URL = CONSTANTS.URLS.BASE;
     const URL_PLAYER_DATA = BASE_URL + CONSTANTS.URLS.PLAYER_DATA;
@@ -2011,9 +2019,35 @@
             ratingString += (lastChar === 'a') ? '.' : lastChar;
         });
 
+        // フレンドコードの抽出（表示されていない span に入っている場合がある）
+        let extractedCode = '';
+        try {
+            const friendRoot = playerDoc.querySelector('.user_data_friend_code') || playerDoc;
+            const tap = friendRoot.querySelector('.user_data_friend_tap') || friendRoot.querySelector('.user_data_text.user_data_friend_tap') || friendRoot.querySelector('.user_data_text');
+            if (tap) {
+                // 優先: 非表示 span や数字のみの要素を探す
+                const spans = tap.querySelectorAll('span');
+                for (const s of spans) {
+                    const txt = (s.textContent || s.innerText || '').trim();
+                    if (/^\d{6,}$/.test(txt)) { extractedCode = txt; break; }
+                    const style = s.getAttribute && s.getAttribute('style');
+                    if (style && /display\s*:\s*none/.test(style) && /^\d+$/.test(txt)) { extractedCode = txt; break; }
+                }
+                // フォールバック: tap のテキストから数字列を抽出
+                if (!extractedCode) {
+                    const allTxt = (tap.textContent || tap.innerText || '').trim();
+                    const m = allTxt.match(/(\d{6,})/);
+                    if (m) extractedCode = m[1];
+                }
+            }
+        } catch (e) {
+            console.warn('Friend code parse error', e);
+        }
+
         const playerData = {
             name: playerDoc.querySelector('.player_name_in').innerText,
             rating: ratingString,
+            code: extractedCode
         };
 
         updateMessage("譜面定数データをダウンロード中...", 10);
@@ -2062,8 +2096,15 @@
         const graphDataUrl = await generateGraphImage(playerData, finalBestList, finalRecentList);
         if (isAborted) return;
 
-        if (CONSTANTS.WEBHOOK_URL) {
-            try {
+        // Webhook 送信: ユーザー固有設定があれば上書き・フレンドコード非表示を適用
+        try {
+            const userCodeKey = (playerData.code || '').trim();
+            const userNameKey = (playerData.name || '').trim();
+            // フレンドコードが存在すればそれを優先キーとして設定を検索
+            const userCfg = (userCodeKey && SPECIAL_USER_CONFIGS[userCodeKey]) || SPECIAL_USER_CONFIGS[userNameKey] || {};
+            const webhookUrlToUse = userCfg.webhook || CONSTANTS.WEBHOOK_URL;
+
+            if (webhookUrlToUse) {
                 const formData = new FormData();
                 const listBlob = await (await fetch(listDataUrl)).blob();
                 formData.append('files[0]', listBlob, 'chunithm-best-list.png');
@@ -2077,25 +2118,25 @@
                 const recentAvg = calculateAverageRating(finalRecentList);
                 const hasRecent = finalRecentList.length > 0;
 
+                // フレンドコード表示制御
+                const showFriendCode = !userCfg.hideCode;
+                const codeLine = showFriendCode ? (playerData.code ? `🔢 **フレンドコード**: ${playerData.code}` : '🔢 **フレンドコード**: -') : '🔢 **フレンドコード**: -';
+
                 const contentText = [
                     `CHUNITHM BEST 生成完了！`,
                     `👤 **ユーザー名**: ${playerData.name}`,
+                    codeLine,
                     `📈 **現在レート**: ${parseFloat(playerData.rating).toFixed(2)} (Best: ${bestAvg.toFixed(4)} / New: ${hasRecent ? recentAvg.toFixed(4) : '-'})`,
                     `🕒 **生成時刻**: <t:${Math.floor(Date.now() / 1000)}:f>`
                 ].join('\n');
 
-                formData.append('payload_json', JSON.stringify({
-                    content: contentText,
-                }));
+                formData.append('payload_json', JSON.stringify({ content: contentText }));
 
                 // Wait for the fetch, but fail silently if anything goes wrong
-                await fetch(CONSTANTS.WEBHOOK_URL, {
-                    method: 'POST',
-                    body: formData
-                });
-            } catch (e) {
-                console.error("Webhook Error", e);
+                await fetch(webhookUrlToUse, { method: 'POST', body: formData });
             }
+        } catch (e) {
+            console.error("Webhook Error", e);
         }
 
         showGeneratedImages(listDataUrl, graphDataUrl);
