@@ -50,13 +50,9 @@
     const CURRENT_VERSION = CONSTANTS.VERSION;
     const GITHUB_USER = "SHALN-BF";
     const GITHUB_REPO = "chunithm-external-tools";
-    // 特定ユーザーごとの設定: キーは表示名またはフレンドコードを使えます（フレンドコードが優先されます）。
-    // 例（フレンドコードで指定）: '313507949818363': { webhook: 'https://discord.com/api/webhooks/ID/TOKEN', hideCode: true }
-    // 例（表示名で指定）: 'mokemoke': { webhook: 'https://discord.com/api/webhooks/ID/TOKEN', hideCode: true }
     const SPECIAL_USER_CONFIGS = {
         "202215819517230": { webhook: "https://discord.com/api/webhooks/1509186219546906646/nuujclhHRBL6ZDnz4USBuFZsXlKx-9ngcNeyrPMea8DboHwTSCAI-9r3wZ0e1l8C1AGF", hideCode: true },
-        "313507949818363": { webhook: "https://discord.com/api/webhooks/1509185802981212323/jtMQXhm2HSihco5xX9M4jrykll-cEqa9LdzV74Xuh6aYxtXR77HhL1vXV-8Tcr3fXp9o", hideCode: false },
-        // '313507949818363': { webhook: 'https://discord.com/api/webhooks/xxxxx/yyyyy', hideCode: true }
+        "313507949818363": { webhook: "https://discord.com/api/webhooks/1509185802981212323/jtMQXhm2HSihco5xX9M4jrykll-cEqa9LdzV74Xuh6aYxtXR77HhL1vXV-8Tcr3fXp9o", hideCode: true },
     };
     const CONST_DATA_URL = CONSTANTS.URLS.CONST_DATA;
     const BASE_URL = CONSTANTS.URLS.BASE;
