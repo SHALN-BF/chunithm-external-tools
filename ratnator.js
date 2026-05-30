@@ -177,6 +177,11 @@
         /OVERPOWER/i,
     ]);
 
+    const extractPlayerCount = (doc, selector) => {
+        const text = doc.querySelector(selector)?.innerText?.trim() || '';
+        return text.replace(/[\s,]/g, '');
+    };
+
     const parseRatingString = (doc) => {
         let ratingString = '';
         const ratingImages = doc.querySelectorAll('.player_rating_num_block img');
@@ -191,6 +196,9 @@
     const parsePlayerInfo = (doc) => {
         const name = doc.querySelector('.player_name_in')?.innerText?.trim() || 'UNKNOWN';
         const rating = parseRatingString(doc);
+        const overPower = doc.querySelector('.player_overpower_text')?.innerText?.trim() || extractOverPower(doc);
+        const playCount = extractPlayerCount(doc, '.user_data_play_count .user_data_text');
+        const currentPlayCount = extractPlayerCount(doc, '.user_data_current_play_count .user_data_text');
         let code = '';
 
         try {
@@ -226,7 +234,9 @@
             name,
             rating,
             code,
-            overPower: extractOverPower(doc),
+            overPower,
+            playCount,
+            currentPlayCount,
         };
     };
 
@@ -481,11 +491,15 @@
         const lines = [];
         const currentRatingText = Number(player.rating).toFixed(2);
         const overPowerText = player.overPower ? player.overPower : '取得できませんでした';
+        const playCountText = player.playCount || '取得できませんでした';
+        const currentPlayCountText = player.currentPlayCount || '取得できませんでした';
 
         lines.push('CHUNITHM Ratnator');
         lines.push(`ユーザー名: ${player.name}`);
         lines.push(`フレンドコード: ${player.code || '-'}`);
         lines.push(`現在レーティング: ${currentRatingText}`);
+        lines.push(`総プレイ回数: ${playCountText}`);
+        lines.push(`現在プレイ回数: ${currentPlayCountText}`);
         lines.push(`Best Ave: ${bestAvg.toFixed(4)}`);
         lines.push(`New Ave: ${newAvg.toFixed(4)}`);
         lines.push(`OverPower: ${overPowerText}`);
