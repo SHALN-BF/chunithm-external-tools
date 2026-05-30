@@ -278,7 +278,7 @@
 
     const fetchRatingDetailSongSeeds = async (pageUrl) => {
         const doc = await fetchDocument(pageUrl);
-        const songForms = doc.querySelectorAll('form[action$="sendRankingDetail/"]');
+        const songForms = doc.querySelectorAll('form[action$="sendMusicDetail/"]');
         const initialSongList = [];
 
         songForms.forEach(form => {
