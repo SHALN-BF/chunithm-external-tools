@@ -28,6 +28,18 @@
 
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+    const createDiagnostics = () => {
+        const entries = [];
+        return {
+            entries,
+            log(step, data = {}) {
+                const entry = { step, ...data };
+                entries.push(entry);
+                console.log('[Ratnator]', step, data);
+            },
+        };
+    };
+
     const fetchDocument = async (url, options = {}) => {
         const response = await fetch(url, options);
         if (response.status === 503) {
@@ -255,7 +267,7 @@
         };
     };
 
-    const enrichSongsWithConstData = (constData, songList) => {
+    const enrichSongsWithConstData = (constData, songList, debug = null, label = '') => {
         const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
         const diffNameMap = { BAS: 'BASIC', ADV: 'ADVANCED', EXP: 'EXPERT', MAS: 'MASTER', ULT: 'ULTIMA' };
         const songDataMap = new Map();
@@ -275,12 +287,24 @@
             titleMap.get(normalizedTitle).push(songData);
         }
 
-        return songList.map(song => {
+        const enriched = songList.map(song => {
             const diffCode = String(song.params?.diff ?? '');
             const diffKey = diffMap[diffCode];
             if (!diffKey) return null;
 
             const normalizedTitle = normalizeTitle(song.title);
+
+            if (debug) {
+                debug.log('enrich', {
+                    label,
+                    inputCount: songList.length,
+                    outputCount: enriched.length,
+                    sampleInput: songList.slice(0, 3).map(song => ({ title: song.title, diff: song.params?.diff, score_int: song.score_int })),
+                    sampleOutput: enriched.slice(0, 3).map(song => ({ title: song.title, difficulty: song.difficulty, const: song.const })),
+                });
+            }
+
+            return enriched;
             let songData = songDataMap.get(`${normalizedTitle}|${diffKey}`);
             if (!songData) {
                 const candidates = titleMap.get(normalizedTitle) || [];
@@ -303,7 +327,7 @@
         }).filter(Boolean);
     };
 
-    const fetchRatingDetailSongSeeds = async (pageUrl) => {
+    const fetchRatingDetailSongSeeds = async (pageUrl, debug = null, label = '') => {
         const doc = await fetchDocument(pageUrl);
         const songForms = doc.querySelectorAll('form[action$="sendMusicDetail/"]');
         const initialSongList = [];
@@ -327,11 +351,21 @@
             });
         });
 
+        if (debug) {
+            debug.log('seed', {
+                label,
+                count: initialSongList.length,
+                sample: initialSongList.slice(0, 3).map(song => ({ title: song.title, diff: song.params?.diff, score_int: song.score_int })),
+            });
+        }
+
         return initialSongList;
     };
 
-    const processSongList = async (list, delay) => {
+    const processSongList = async (list, delay, debug = null, label = '') => {
         const detailedSongs = [];
+        let successCount = 0;
+        let failCount = 0;
 
         for (let i = 0; i < list.length; i++) {
             const song = list[i];
@@ -353,6 +387,7 @@
                 const scoreStr = detailStats.scoreStr || song.score_str || '';
                 if (!Number.isFinite(scoreInt) || scoreInt <= 0) continue;
 
+                successCount++;
                 detailedSongs.push({
                     ...song,
                     score_str: scoreStr,
@@ -360,6 +395,7 @@
                     playCount: detailStats.playCount || song.playCount || 'N/A',
                 });
             } catch (error) {
+                failCount++;
                 console.warn(`スコア取得失敗: ${song.title}`, error);
                 if (Number(song.score_int) > 0) {
                     detailedSongs.push({
@@ -372,15 +408,30 @@
             }
         }
 
+        if (debug) {
+            debug.log('detail', {
+                label,
+                inputCount: list.length,
+                outputCount: detailedSongs.length,
+                successCount,
+                failCount,
+                sampleOutput: detailedSongs.slice(0, 3).map(song => ({ title: song.title, score_int: song.score_int, const: song.const })),
+            });
+        }
+
         return detailedSongs;
     };
 
     const fetchAllSongsForPaidUserViaRecord = async (delay, constData, options = {}) => {
-        const bestSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_BEST);
-        const recentSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_RECENT);
+        const { debug = null } = options;
+        const bestSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_BEST, debug, 'BEST seed page');
+        const recentSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_RECENT, debug, 'NEW seed page');
 
-        const detailedOldSongs = await processSongList(enrichSongsWithConstData(constData, bestSeeds), delay);
-        const detailedNewSongs = await processSongList(enrichSongsWithConstData(constData, recentSeeds), delay);
+        const enrichedOldSongs = enrichSongsWithConstData(constData, bestSeeds, debug, 'BEST');
+        const enrichedNewSongs = enrichSongsWithConstData(constData, recentSeeds, debug, 'NEW');
+
+        const detailedOldSongs = await processSongList(enrichedOldSongs, delay, debug, 'BEST detail');
+        const detailedNewSongs = await processSongList(enrichedNewSongs, delay, debug, 'NEW detail');
 
         detailedNewSongs.forEach(song => {
             song.rating = calculateRating(song.score_int, song.const);
@@ -522,7 +573,7 @@
         ].join('\n');
     };
 
-    const renderTextReport = (player, bestList, newList) => {
+    const renderTextReport = (player, bestList, newList, diagnostics = []) => {
         const bestAvg = calculateAverageRating(bestList);
         const newAvg = calculateAverageRating(newList);
         const lines = [];
@@ -569,6 +620,16 @@
             });
         }
 
+        if (diagnostics.length > 0) {
+            lines.push('');
+            lines.push('【DEBUG】');
+            diagnostics.forEach(entry => {
+                const payload = { ...entry };
+                delete payload.step;
+                lines.push(`${entry.step}: ${JSON.stringify(payload)}`);
+            });
+        }
+
         return lines.join('\n');
     };
 
@@ -583,6 +644,8 @@
         }
 
         const overlayRefs = createOverlay();
+        const diagnostics = createDiagnostics();
+        window.__ratnatorDebug = diagnostics.entries;
         overlayRefs.statusEl.textContent = 'プレイヤー情報を取得中...';
         overlayRefs.body.textContent = '読み込み中...';
 
@@ -597,19 +660,32 @@
         try {
             const playerDoc = await fetchDocument(URL_PLAYER_DATA);
             const player = parsePlayerInfo(playerDoc);
+            diagnostics.log('player', {
+                name: player.name,
+                rating: player.rating,
+                overPower: player.overPower,
+                playCount: player.playCount,
+                currentPlayCount: player.currentPlayCount,
+            });
             overlayRefs.statusEl.innerHTML = `ユーザー: <span style="color:#8df0c9;">${player.name}</span><br>レーティングを解析しました`;
 
             const constData = await fetch(CONST_DATA_URL).then(response => response.json());
+            diagnostics.log('const', { count: Array.isArray(constData) ? constData.length : 0 });
             overlayRefs.statusEl.innerHTML += '<br>定数データを取得しました';
 
-            const paidResult = await fetchAllSongsForPaidUserViaRecord(SONG_DETAIL_DELAY_SEC, constData);
+            const paidResult = await fetchAllSongsForPaidUserViaRecord(SONG_DETAIL_DELAY_SEC, constData, { debug: diagnostics });
             const detailedOldSongs = paidResult.detailedOldSongs;
             const detailedNewSongs = paidResult.detailedNewSongs;
+
+            diagnostics.log('final', {
+                bestCount: detailedOldSongs.length,
+                newCount: detailedNewSongs.length,
+            });
 
             const frameLists = buildFrameLists(detailedOldSongs, detailedNewSongs);
             const bestList = frameLists.best;
             const newList = frameLists.recent;
-            reportText = renderTextReport(player, bestList, newList);
+            reportText = renderTextReport(player, bestList, newList, diagnostics.entries);
             overlayRefs.body.textContent = reportText;
             overlayRefs.statusEl.innerHTML = `
                 ユーザー: <span style="color:#8df0c9;">${player.name}</span><br>
