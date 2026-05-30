@@ -15,129 +15,6 @@
             RANKING: { DETAIL_SEND: 'ranking/sendRankingDetail/' }
         }
     };
-
-    const fetchDetailForSeed = async (seed) => {
-        if (!seed) return seed;
-        const url = seed.detailSendUrl || URL_RANKING_DETAIL_SEND;
-        try {
-            const options = {
-                method: 'POST',
-                body: new URLSearchParams(seed.params || {}),
-            };
-            const doc = await fetchDocument(url, options);
-
-            const normalizeDiff = (raw) => {
-                if (!raw) return null;
-                const s = String(raw).trim();
-                // numeric
-                const num = s.match(/([0-4])/);
-                if (num) return String(num[1]);
-                const lower = s.toLowerCase();
-                // english keywords
-                if (/\b(basic|bas)\b/.test(lower)) return '0';
-                if (/\b(advanced|adv)\b/.test(lower)) return '1';
-                if (/\b(expert|exp)\b/.test(lower)) return '2';
-                if (/\b(master|mas)\b/.test(lower)) return '3';
-                if (/\b(ultima|ult|ultimate)\b/.test(lower)) return '4';
-                // japanese katakana/hiragana variants
-                if (/ベーシック|ベーシク|べーしっく|ベシック|ベーシック/.test(s)) return '0';
-                if (/アドバンス|アドバン|アドバンスド|アドバ|あどばんす/.test(s)) return '1';
-                if (/エキスパート|エキスパ|エクスパート/.test(s)) return '2';
-                if (/マスター|マスタ/.test(s)) return '3';
-                if (/ウルティマ|アルティマ|ウルティメイト|アルティメット|ウルティマ/.test(s)) return '4';
-                return null;
-            };
-
-            // base stats from whole doc
-            let stats = extractMusicDetailStats(doc);
-
-            // handle pages with multiple difficulty entries
-            try {
-                const diffInputs = Array.from(doc.querySelectorAll('input[name="diff"]'));
-                if (diffInputs.length > 1) {
-                    const candidates = [];
-                    for (const inp of diffInputs) {
-                        const val = inp.value || inp.getAttribute('value') || '';
-                        const container = inp.closest('form') || inp.closest('.music_box') || inp.closest('.musiclist_box') || inp.parentElement || doc;
-                        const cstats = extractMusicDetailStats(container || doc);
-                        candidates.push({ val: String(val), stats: cstats, container });
-                    }
-
-                    // pick candidate: prefer matching seed.params.diff, then positive score, then first
-                    let pick = null;
-                    if (seed.params && seed.params.diff) {
-                        pick = candidates.find(c => String(c.val) === String(seed.params.diff));
-                    }
-                    if (!pick) {
-                        pick = candidates.find(c => c.stats && Number.isFinite(c.stats.scoreInt) && c.stats.scoreInt > 0);
-                    }
-                    if (!pick) pick = candidates[0];
-
-                    if (pick) {
-                        stats = pick.stats || stats;
-                        const normalized = normalizeDiff(pick.val || '');
-                        if (normalized !== null && seed.params && String(seed.params.diff) !== String(normalized)) {
-                            try { console.info('[Ratnator][Diagnostics] diff override (multi)', { title: seed.title, from: seed.params.diff, to: normalized, raw: pick.val }); } catch (e) { }
-                            seed.params.diff = String(normalized);
-                        }
-                    }
-                } else {
-                    // single-diff page: try to detect textual difficulty too
-                    const diffSelectors = [
-                        '.musicdata_detail_difficulty',
-                        '.music_difficulty',
-                        '.musicdata_difficulty',
-                        '.music_detail_diff',
-                        '.detail_diff',
-                        '.diff_label',
-                    ];
-                    let diffRaw = '';
-                    const inputDiff = doc.querySelector('input[name="diff"]');
-                    if (inputDiff && inputDiff.value) diffRaw = String(inputDiff.value).trim();
-                    if (!diffRaw) {
-                        for (const sel of diffSelectors) {
-                            try {
-                                const el = doc.querySelector(sel);
-                                if (el) {
-                                    const t = (el.innerText || el.textContent || '').trim();
-                                    if (t) { diffRaw = t; break; }
-                                }
-                            } catch (e) { /* ignore */ }
-                        }
-                    }
-                    const normalized = normalizeDiff(diffRaw || '');
-                    if (normalized !== null && seed.params && String(seed.params.diff) !== String(normalized)) {
-                        try { console.info('[Ratnator][Diagnostics] diff override', { title: seed.title, from: seed.params.diff, to: normalized, raw: diffRaw }); } catch (e) { }
-                        seed.params.diff = String(normalized);
-                    }
-                }
-            } catch (e) { /* ignore multi-diff parse errors */ }
-
-            if (stats) {
-                if (stats.scoreInt && stats.scoreInt > 0) {
-                    seed.score_int = stats.scoreInt;
-                    seed.score_str = stats.scoreStr || seed.score_str;
-                }
-                if (stats.playCount) seed.playCount = stats.playCount;
-            }
-        } catch (err) {
-            try { console.warn('[Ratnator] fetchDetailForSeed failed', { title: seed.title, err: String(err) }); } catch (e) { }
-        }
-        return seed;
-    };
-
-    const fetchDetailsForSeeds = async (seeds, label = '') => {
-        if (!Array.isArray(seeds) || seeds.length === 0) return seeds;
-        try { console.info('[Ratnator][Diagnostics] fetchDetailsForSeeds start', { label, count: seeds.length }); } catch (e) { }
-        for (let i = 0; i < seeds.length; i++) {
-            const s = seeds[i];
-            await fetchDetailForSeed(s);
-            try { if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(25 + Math.floor((i / seeds.length) * 50), `Detail ${label}: ${i + 1}/${seeds.length}`); } catch (e) { }
-            await sleep(SONG_DETAIL_DELAY_SEC * 1000);
-        }
-        try { console.info('[Ratnator][Diagnostics] fetchDetailsForSeeds done', { label }); } catch (e) { }
-        return seeds;
-    };
     const CURRENT_VERSION = CONSTANTS.VERSION;
     const BASE_URL = CONSTANTS.URLS.BASE;
     const CONST_DATA_URL = CONSTANTS.URLS.CONST_DATA;
@@ -345,9 +222,9 @@
         const playCountSelectors = [
             '.musiclist_box .playcount .text_b',
             '.musiclist_box .musicdata_playcount .text_b',
-            '.block_underline .musicdata_playcount .text_b',
+            '.block_underline .musicdata_score_num .text_b',
             '.musicdata_playcount .text_b',
-            '.play_count .text_b',
+            '.play_count .text_b'
         ];
         const playCountTextCandidate = getTextFromSelectors(root, playCountSelectors) || extractTextByLabel(root, [/プレイ回数/i, /プレイ数/i, /PLAY\s*COUNT/i, /PLAYCOUNT/i]);
 
@@ -530,7 +407,7 @@
                 const: Number(songData.const),
                 score_int: scoreInt,
                 score_str: (matchMode === 'exact' && initialSong.score_str) ? initialSong.score_str : '',
-                playCount: (initialSong && initialSong.playCount) ? initialSong.playCount : 'N/A',
+                playCount: 'N/A',
                 params: params,
                 jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/html/mobile/img/${songData.img}.jpg` : '',
             };
@@ -562,32 +439,17 @@
 
     const fetchRatingDetailSongSeeds = async (pageUrl, label = '') => {
         const doc = await fetchDocument(pageUrl);
-        // Accept multiple form patterns: sendMusicDetail, sendRankingDetail, or any form that contains idx/diff inputs
-        const allForms = Array.from(doc.querySelectorAll('form'));
-        const songForms = allForms.filter(f => {
-            // prefer explicit actions, but accept forms that contain idx/diff inputs
-            const action = (f.getAttribute('action') || '').toLowerCase();
-            if (action.includes('sendmusicdetail') || action.includes('sendrankingdetail') || action.includes('sendranking')) return true;
-            return !!(f.querySelector('input[name="idx"]') || f.querySelector('input[name="diff"]'));
-        });
-
+        const songForms = doc.querySelectorAll('form[action$="sendMusicDetail/"]');
         const initialSongList = [];
 
         songForms.forEach(form => {
-            // title can be inside the form or in nearby containers; try several fallbacks
-            const container = form.closest('.music_box') || form.previousElementSibling || form.parentElement || form;
-            let title = (form.querySelector('.music_title')?.innerText?.trim()) ||
-                (container && container.querySelector('.play_musicdata_title')?.innerText?.trim()) ||
-                (container && container.querySelector('.musicdata_title')?.innerText?.trim()) ||
-                (doc.querySelector('.play_musicdata_title')?.innerText?.trim()) || '';
-
-            const seedStats = extractSeedDetailStats(container || form);
+            const title = form.querySelector('.music_title')?.innerText?.trim();
+            const seedStats = extractSeedDetailStats(form);
             const params = {};
             form.querySelectorAll('input[name]').forEach(input => {
                 params[input.name] = input.value || '';
             });
-            // require at least idx and token to be considered a seed
-            if (!title || !params.idx || !params.token) return;
+            if (!title || !params.idx || !params.token || !params.genre || !params.diff) return;
 
             initialSongList.push({
                 title,
@@ -605,44 +467,6 @@
             const samples = initialSongList.slice(0, 20).map(s => ({ title: s.title, idx: s.params?.idx, diff: s.params?.diff, score_int: s.score_int }));
             console.info('[Ratnator][Diagnostics] seed samples', { label, samples });
         } catch (e) { }
-
-        // additional: many pages render a global title and per-diff .music_box blocks
-        try {
-            const existingIdxs = new Set(initialSongList.map(s => s.params?.idx));
-            const boxes = Array.from(doc.querySelectorAll('.music_box'));
-            const globalTitle = doc.querySelector('.play_musicdata_title')?.innerText?.trim() || '';
-            boxes.forEach(box => {
-                try {
-                    const form = box.querySelector('form') || box.querySelector('form[action]');
-                    const params = {};
-                    if (form) {
-                        form.querySelectorAll('input[name]').forEach(input => { params[input.name] = input.value || ''; });
-                    }
-                    // if no form, try to find hidden inputs anywhere inside box
-                    if (!form) {
-                        const inputs = box.querySelectorAll('input[type=hidden][name]');
-                        inputs.forEach(input => { params[input.name] = input.value || ''; });
-                    }
-
-                    if (!params.idx || !params.token) return; // require seed identifiers
-                    if (existingIdxs.has(params.idx)) return;
-
-                    const title = globalTitle || box.querySelector('.play_musicdata_title')?.innerText?.trim() || box.querySelector('.musicdata_title')?.innerText?.trim() || '';
-                    if (!title) return;
-
-                    const seedStats = extractSeedDetailStats(box);
-                    initialSongList.push({
-                        title,
-                        detailSendUrl: (form && form.getAttribute('action')) ? new URL(form.getAttribute('action'), window.location.origin).href : '',
-                        params,
-                        score_str: seedStats.score_str,
-                        score_int: seedStats.score_int,
-                        playCount: seedStats.playCount || 'N/A',
-                    });
-                    existingIdxs.add(params.idx);
-                } catch (e) { /* ignore individual box errors */ }
-            });
-        } catch (e) { /* ignore box-scan errors */ }
 
         try {
             if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(5, `Seeds ${label}: ${initialSongList.length}曲`);
@@ -821,9 +645,6 @@
             // Simplified flow: only retrieve seeds (BEST/NEW), enrich with const data, and render lists
             const bestSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_BEST, 'BEST seed page');
             const recentSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_RECENT, 'NEW seed page');
-            // Fetch detail pages for each seed to get accurate play count and scores
-            await fetchDetailsForSeeds(bestSeeds, 'BEST');
-            await fetchDetailsForSeeds(recentSeeds, 'NEW');
             try { console.info('[Ratnator][Diagnostics] seeds', { best: bestSeeds.length, recent: recentSeeds.length }); } catch (e) { }
 
             const enrichedOldSongs = enrichSongsWithConstData(constData, bestSeeds, 'BEST');
