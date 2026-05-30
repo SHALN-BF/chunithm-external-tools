@@ -403,6 +403,8 @@
                 successCount++;
                 detailedSongs.push({
                     ...song,
+                    seed_score_int: seedScoreInt,
+                    detail_score_int: detailScoreInt,
                     score_str: scoreStr,
                     score_int: scoreInt,
                     playCount: detailStats.playCount || song.playCount || 'N/A',
@@ -420,6 +422,8 @@
                 if (Number(song.score_int) > 0) {
                     detailedSongs.push({
                         ...song,
+                        seed_score_int: Number(song.score_int) || 0,
+                        detail_score_int: null,
                         score_str: song.score_str || String(song.score_int),
                         score_int: Number(song.score_int),
                         playCount: song.playCount || 'N/A',
@@ -702,37 +706,51 @@
     const renderHtmlReport = (player, bestList, newList, diagnostics = []) => {
         const bestRows = bestList.map((song, idx) => {
             const rankInfo = getRankInfo(song.score_int);
-            const scoreText = song.score_str || song.score_int.toLocaleString('en-US');
             const playCountText = song.playCount && song.playCount !== 'N/A' ? song.playCount : 'N/A';
             const ratingText = Number.isFinite(song.rating) ? song.rating.toFixed(2) : '0.00';
             const constText = Number.isFinite(song.const) ? song.const.toFixed(2) : 'N/A';
+            const seedScore = Number.isFinite(song.seed_score_int) ? song.seed_score_int : null;
+            const detailScore = Number.isFinite(song.detail_score_int) ? song.detail_score_int : (Number.isFinite(song.score_int) ? song.score_int : null);
+            const usedScoreText = song.score_str || (song.score_int ? String(song.score_int) : '');
+            const delta = (seedScore !== null && detailScore !== null) ? (detailScore - seedScore) : 0;
+            const mismatch = delta !== 0;
+            const rowStyle = mismatch ? 'background: rgba(255,100,100,0.04);' : '';
+            const scoreHtml = `${escapeHtml(usedScoreText)}<br/><small style="color:#9fb7d9;">${escapeHtml(rankInfo.rank)}</small>${mismatch ? `<div style="font-size:11px;color:#ffd7d7;">seed:${seedScore ?? '-'} → detail:${detailScore ?? '-'} (Δ${delta})</div>` : ''}`;
+
             return `
-                <tr>
+                <tr style="${rowStyle}">
                     <td style="padding:6px 8px; text-align:right;">${idx + 1}</td>
                     <td style="padding:6px 8px;">${escapeHtml(song.title)}</td>
                     <td style="padding:6px 8px; text-align:center;">${escapeHtml(song.difficulty || '')}</td>
                     <td style="padding:6px 8px; text-align:right;">${escapeHtml(playCountText)}</td>
                     <td style="padding:6px 8px; text-align:right;">${escapeHtml(constText)}</td>
                     <td style="padding:6px 8px; text-align:right;">${escapeHtml(ratingText)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(scoreText)}<br/><small style="color:#9fb7d9;">${escapeHtml(rankInfo.rank)}</small></td>
+                    <td style="padding:6px 8px; text-align:right;">${scoreHtml}</td>
                 </tr>`;
         }).join('');
 
         const newRows = newList.map((song, idx) => {
             const rankInfo = getRankInfo(song.score_int);
-            const scoreText = song.score_str || song.score_int.toLocaleString('en-US');
             const playCountText = song.playCount && song.playCount !== 'N/A' ? song.playCount : 'N/A';
             const ratingText = Number.isFinite(song.rating) ? song.rating.toFixed(2) : '0.00';
             const constText = Number.isFinite(song.const) ? song.const.toFixed(2) : 'N/A';
+            const seedScore = Number.isFinite(song.seed_score_int) ? song.seed_score_int : null;
+            const detailScore = Number.isFinite(song.detail_score_int) ? song.detail_score_int : (Number.isFinite(song.score_int) ? song.score_int : null);
+            const usedScoreText = song.score_str || (song.score_int ? String(song.score_int) : '');
+            const delta = (seedScore !== null && detailScore !== null) ? (detailScore - seedScore) : 0;
+            const mismatch = delta !== 0;
+            const rowStyle = mismatch ? 'background: rgba(255,100,100,0.04);' : '';
+            const scoreHtml = `${escapeHtml(usedScoreText)}<br/><small style="color:#9fb7d9;">${escapeHtml(rankInfo.rank)}</small>${mismatch ? `<div style="font-size:11px;color:#ffd7d7;">seed:${seedScore ?? '-'} → detail:${detailScore ?? '-'} (Δ${delta})</div>` : ''}`;
+
             return `
-                <tr>
+                <tr style="${rowStyle}">
                     <td style="padding:6px 8px; text-align:right;">${idx + 1}</td>
                     <td style="padding:6px 8px;">${escapeHtml(song.title)}</td>
                     <td style="padding:6px 8px; text-align:center;">${escapeHtml(song.difficulty || '')}</td>
                     <td style="padding:6px 8px; text-align:right;">${escapeHtml(playCountText)}</td>
                     <td style="padding:6px 8px; text-align:right;">${escapeHtml(constText)}</td>
                     <td style="padding:6px 8px; text-align:right;">${escapeHtml(ratingText)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(scoreText)}<br/><small style="color:#9fb7d9;">${escapeHtml(rankInfo.rank)}</small></td>
+                    <td style="padding:6px 8px; text-align:right;">${scoreHtml}</td>
                 </tr>`;
         }).join('');
 
