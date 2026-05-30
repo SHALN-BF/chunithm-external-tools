@@ -293,18 +293,6 @@
             if (!diffKey) return null;
 
             const normalizedTitle = normalizeTitle(song.title);
-
-            if (debug) {
-                debug.log('enrich', {
-                    label,
-                    inputCount: songList.length,
-                    outputCount: enriched.length,
-                    sampleInput: songList.slice(0, 3).map(song => ({ title: song.title, diff: song.params?.diff, score_int: song.score_int })),
-                    sampleOutput: enriched.slice(0, 3).map(song => ({ title: song.title, difficulty: song.difficulty, const: song.const })),
-                });
-            }
-
-            return enriched;
             let songData = songDataMap.get(`${normalizedTitle}|${diffKey}`);
             if (!songData) {
                 const candidates = titleMap.get(normalizedTitle) || [];
@@ -325,6 +313,16 @@
                 jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/html/mobile/img/${songData.img}.jpg` : '',
             };
         }).filter(Boolean);
+
+        if (debug) {
+            debug.log('enrich', {
+                label,
+                inputCount: songList.length,
+                outputCount: enriched.length,
+                sampleInput: songList.slice(0, 3).map(song => ({ title: song.title, diff: song.params?.diff, score_int: song.score_int })),
+                sampleOutput: enriched.slice(0, 3).map(song => ({ title: song.title, difficulty: song.difficulty, const: song.const })),
+            });
+        }
     };
 
     const fetchRatingDetailSongSeeds = async (pageUrl, debug = null, label = '') => {
