@@ -69,8 +69,21 @@
      */
     const parseScoreFromText = (text) => {
         if (!text) return { scoreStr: '', scoreInt: 0 };
-        const normalized = String(text).replace(/\s+/g, '');
-        const match = normalized.match(/\d[\d,]{5,}/);
+        const normalized = String(text).normalize('NFKC').replace(/\s+/g, '');
+        // primary: contiguous digits (with optional commas) of length >=6
+        let match = normalized.match(/\d[\d,]{5,}/);
+        if (!match) {
+            // fallback: collect digit groups (and comma-separated groups) and pick the longest
+            const groups = normalized.match(/[\d,]+/g) || [];
+            let best = '';
+            for (const g of groups) {
+                const digitsOnly = g.replace(/,/g, '');
+                if (digitsOnly.length >= 6 && digitsOnly.length > best.replace(/,/g, '').length) {
+                    best = g;
+                }
+            }
+            if (best) match = [best];
+        }
         if (!match) return { scoreStr: '', scoreInt: 0 };
         const scoreStr = match[0];
         const scoreInt = parseInt(scoreStr.replace(/,/g, ''), 10) || 0;
@@ -372,7 +385,8 @@
             }
 
             const scoreInt = (matchMode === 'exact' && Number.isFinite(initialSong.score_int)) ? initialSong.score_int : 0;
-            if (matchMode === 'exact' && scoreInt <= 0) {
+            // Accept zero scores (0点) — only skip if negative or truly missing
+            if (matchMode === 'exact' && scoreInt < 0) {
                 skippedNoScore++;
                 if (skippedSamples.length < 10) skippedSamples.push({ title: songData.title, diff: songData.diff, reason: 'no-score' });
                 continue; // paid mode: skip if no score
@@ -898,80 +912,8 @@
             </div>
         `;
 
-        // build a combined diff table for all songs (BEST then NEW)
-        const buildDiffRows = (lists) => {
-            let idx = 0;
-            return lists.flatMap(section => {
-                return section.map(song => {
-                    idx++;
-                    const seedScore = Number.isFinite(song.seed_score_int) ? song.seed_score_int : null;
-                    const detailScore = Number.isFinite(song.detail_score_int) ? song.detail_score_int : (Number.isFinite(song.score_int) ? song.score_int : null);
-                    const delta = (seedScore !== null && detailScore !== null) ? (detailScore - seedScore) : 0;
-                    const mismatch = delta !== 0;
-                    return {
-                        no: idx,
-                        kind: song._source || '',
-                        title: song.title,
-                        diff: song.difficulty || '',
-                        idxParam: song.params?.idx || '',
-                        diffParam: song.params?.diff || '',
-                        seed: seedScore,
-                        detail: detailScore,
-                        delta,
-                        const: Number.isFinite(song.const) ? song.const.toFixed(2) : '',
-                        mismatch,
-                    };
-                });
-            });
-        };
-
-        const combined = buildDiffRows([bestList, newList]);
-        const diffRowsHtml = combined.map(row => {
-            const rowStyle = row.mismatch ? 'background: rgba(255,100,100,0.04);' : '';
-            return `
-                <tr style="${rowStyle}">
-                    <td style="padding:6px 8px; text-align:right;">${row.no}</td>
-                    <td style="padding:6px 8px;">${escapeHtml(row.kind)}</td>
-                    <td style="padding:6px 8px;">${escapeHtml(row.title)}</td>
-                    <td style="padding:6px 8px; text-align:center;">${escapeHtml(row.diff)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(row.idxParam)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(row.diffParam)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${row.seed ?? '-'}</td>
-                    <td style="padding:6px 8px; text-align:right;">${row.detail ?? '-'}</td>
-                    <td style="padding:6px 8px; text-align:right;">${row.delta}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(row.const)}</td>
-                </tr>`;
-        }).join('');
-
-        const diffTableHtml = `
-            <div style="margin-top:18px;">
-                <div style="font-weight:700; color:#ffd27a; margin-bottom:6px;">差分一覧（種 vs 詳細）</div>
-                <div style="max-height:280px; overflow:auto; border:1px solid rgba(255,255,255,0.04); padding:8px; border-radius:8px;">
-                    <table style="${tableStyle}">
-                        <thead>
-                            <tr>
-                                <th style="${thStyle}; width:40px;">No.</th>
-                                <th style="${thStyle}; width:60px;">種別</th>
-                                <th style="${thStyle};">タイトル</th>
-                                <th style="${thStyle}; width:80px;">譜面</th>
-                                <th style="${thStyle}; width:60px;">idx</th>
-                                <th style="${thStyle}; width:60px;">diff</th>
-                                <th style="${thStyle}; width:100px; text-align:right;">seed</th>
-                                <th style="${thStyle}; width:100px; text-align:right;">detail</th>
-                                <th style="${thStyle}; width:80px; text-align:right;">Δ</th>
-                                <th style="${thStyle}; width:80px; text-align:right;">定数</th>
-                            </tr>
-                        </thead>
-                        <tbody style="color:#e7f1ff;">${diffRowsHtml}</tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-
-        // append diff table
-        const finalHtml = html + diffTableHtml;
-
-        return finalHtml;
+        // Diff table removed per user request — return primary HTML only
+        return html;
     };
 
     const escapeHtml = (str) => {
