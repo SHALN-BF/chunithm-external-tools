@@ -160,7 +160,9 @@
 
     const extractMusicDetailStats = (root) => {
         const scoreElement = root.querySelector('.musicdata_score_num .text_b, .rank_playdata_highscore .text_b, .play_musicdata_highscore .text_b');
-        const scoreText = scoreElement?.innerText?.trim() || extractTextByLabel(root, [
+        const scoreElementText = scoreElement?.innerText?.trim();
+        const scoreElementHtml = scoreElement?.outerHTML || '';
+        const scoreText = (scoreElementText && scoreElementText.trim()) || extractTextByLabel(root, [
             /HIGH\s*SCORE/i,
             /SCORE/i,
             /スコア/i,
@@ -179,6 +181,8 @@
         return {
             scoreStr: parsedScore.scoreStr,
             scoreInt: parsedScore.scoreInt,
+            rawScoreText: scoreElementText || scoreText || '',
+            rawScoreHtml: scoreElementHtml || '',
             playCount: playCountText,
         };
     };
@@ -418,7 +422,7 @@
                     score_int: scoreInt,
                     playCount: detailStats.playCount || song.playCount || 'N/A',
                 });
-                if (debug) debug.log('songDetail', { title: song.title, seedScoreInt, detailScoreInt: Number(detailStats.scoreInt) || 0, usedScoreInt: scoreInt });
+                if (debug) debug.log('songDetail', { title: song.title, seedScoreInt, detailScoreInt: Number(detailStats.scoreInt) || 0, usedScoreInt: scoreInt, rawScoreText: detailStats.rawScoreText, rawScoreHtml: detailStats.rawScoreHtml });
                 try {
                     if (window.__ratnatorUpdateProgress) {
                         const p = Math.round(((i + 1) / Math.max(1, list.length)) * 100);
