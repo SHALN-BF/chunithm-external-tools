@@ -651,8 +651,9 @@
             const enrichedNewSongs = enrichSongsWithConstData(constData, recentSeeds, 'NEW');
 
             const frameLists = buildFrameLists(enrichedOldSongs, enrichedNewSongs);
-            const bestList = frameLists.best;
-            const newList = frameLists.recent;
+            // sort by single-song rating (降順). rating がない場合は 0 として扱う
+            const bestList = (frameLists.best || []).slice().sort((a, b) => (b.rating || 0) - (a.rating || 0));
+            const newList = (frameLists.recent || []).slice().sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
             const reportHtml = renderHtmlReport(player, bestList, newList);
             overlayRefs.body.innerHTML = reportHtml;
