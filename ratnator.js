@@ -567,7 +567,9 @@
 
         songForms.forEach(form => {
             const title = form.querySelector('.music_title')?.innerText?.trim();
-            const seedStats = extractSeedDetailStats(form);
+            // try to find a nearby container that holds score/playcount (often the .music_box before the form)
+            const container = form.closest('.music_box') || form.previousElementSibling || form.parentElement || form;
+            const seedStats = extractSeedDetailStats(container);
             const params = {};
             form.querySelectorAll('input[name]').forEach(input => {
                 params[input.name] = input.value || '';
