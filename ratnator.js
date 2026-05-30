@@ -269,6 +269,7 @@
 
     const enrichSongsWithConstData = (constData, songList, debug = null, label = '') => {
         const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
+        const reverseDiffMap = { '0': 'BAS', '1': 'ADV', '2': 'EXP', '3': 'MAS', '4': 'ULT' };
         const diffNameMap = { BAS: 'BASIC', ADV: 'ADVANCED', EXP: 'EXPERT', MAS: 'MASTER', ULT: 'ULTIMA' };
         const songDataMap = new Map();
         const titleMap = new Map();
@@ -289,7 +290,7 @@
 
         const enriched = songList.map(song => {
             const diffCode = String(song.params?.diff ?? '');
-            const diffKey = diffMap[diffCode];
+            const diffKey = reverseDiffMap[diffCode];
             if (!diffKey) return null;
 
             const normalizedTitle = normalizeTitle(song.title);
