@@ -278,6 +278,7 @@
         const songDataMap = new Map();
         const titleMap = new Map();
 
+        const idxMap = new Map();
         for (const songData of constData) {
             if (!songData || !diffMap[songData.diff]) continue;
             const key = `${normalizeTitle(songData.title)}|${songData.diff}`;
@@ -290,6 +291,17 @@
                 titleMap.set(normalizedTitle, []);
             }
             titleMap.get(normalizedTitle).push(songData);
+
+            // build idxMap from possible id fields for robust lookup
+            const possibleIdFields = ['idx', 'id', 'music_id', 'musicId', 'mid', 'no', 'song_id'];
+            for (const f of possibleIdFields) {
+                if (songData[f] !== undefined && songData[f] !== null) {
+                    try {
+                        const idStr = String(songData[f]);
+                        if (!idxMap.has(idStr)) idxMap.set(idStr, songData);
+                    } catch (e) { /* ignore */ }
+                }
+            }
         }
 
         const enriched = songList.map(song => {
@@ -304,8 +316,25 @@
                 songData = candidates.find(entry => entry.diff === diffKey) || candidates[0] || null;
             }
             if (!songData) {
-                if (debug) debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, matched: null, candidates: (titleMap.get(normalizedTitle) || []).length, params: song.params });
-                return null;
+                // try rematch by params.idx
+                const paramIdx = song.params?.idx ? String(song.params.idx) : null;
+                if (paramIdx && idxMap.has(paramIdx)) {
+                    songData = idxMap.get(paramIdx);
+                    if (debug) debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, rematchBy: 'idx', paramIdx, matched: { title: songData.title, diff: songData.diff, const: songData.const }, params: song.params });
+                } else {
+                    if (debug) debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, matched: null, candidates: (titleMap.get(normalizedTitle) || []).length, params: song.params });
+                    return null;
+                }
+            }
+
+            // if matched by title but idx differs, log candidate idx values
+            if (debug) {
+                const matched = { title: songData.title, diff: songData.diff, const: songData.const, img: songData.img };
+                const candidates = (titleMap.get(normalizedTitle) || []).map(c => ({ title: c.title, diff: c.diff, const: c.const }));
+                // find any id value
+                const ids = [];
+                ['idx', 'id', 'music_id', 'musicId', 'mid', 'no', 'song_id'].forEach(k => { if (songData[k] !== undefined) ids.push({ [k]: songData[k] }); });
+                debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, matched, ids, candidatesCount: candidates.length, params: song.params });
             }
 
             if (debug) {
