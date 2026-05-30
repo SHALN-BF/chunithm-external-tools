@@ -392,9 +392,13 @@
 
                 const detailStats = extractMusicDetailStats(detailDoc);
                 const seedScoreInt = Number(song.score_int) || 0;
-                const scoreInt = Number(detailStats.scoreInt) > 0 ? Number(detailStats.scoreInt) : seedScoreInt;
+                const detailScoreInt = Number(detailStats.scoreInt) || 0;
+                const scoreInt = detailScoreInt > 0 ? detailScoreInt : seedScoreInt;
                 const scoreStr = detailStats.scoreStr || song.score_str || '';
-                if (!Number.isFinite(scoreInt) || scoreInt <= 0) continue;
+                if (!Number.isFinite(scoreInt) || scoreInt <= 0) {
+                    if (debug) debug.log('songDetail', { title: song.title, seedScoreInt, detailScoreInt, usedScoreInt: scoreInt, note: 'invalid score, skipped' });
+                    continue;
+                }
 
                 successCount++;
                 detailedSongs.push({
@@ -403,6 +407,7 @@
                     score_int: scoreInt,
                     playCount: detailStats.playCount || song.playCount || 'N/A',
                 });
+                if (debug) debug.log('songDetail', { title: song.title, seedScoreInt, detailScoreInt: Number(detailStats.scoreInt) || 0, usedScoreInt: scoreInt });
                 try {
                     if (window.__ratnatorUpdateProgress) {
                         const p = Math.round(((i + 1) / Math.max(1, list.length)) * 100);
@@ -419,6 +424,7 @@
                         score_int: Number(song.score_int),
                         playCount: song.playCount || 'N/A',
                     });
+                    if (debug) debug.log('songDetail', { title: song.title, seedScoreInt: Number(song.score_int) || 0, detailScoreInt: null, usedScoreInt: Number(song.score_int) || 0, note: 'detail fetch failed, used seed' });
                     try {
                         if (window.__ratnatorUpdateProgress) {
                             const p = Math.round(((i + 1) / Math.max(1, list.length)) * 100);
