@@ -6,16 +6,31 @@
     }
     window.__ratnatorRunning = true;
 
-    const CURRENT_VERSION = 'X-VERSE-X';
-    const BASE_URL = 'https://new.chunithm-net.com/chuni-mobile/html/mobile/';
-    const CONST_DATA_URL = 'https://reiwa.f5.si/chunithm_record.json';
-    const URL_PLAYER_DATA = BASE_URL + 'home/playerData/';
+    const CONSTANTS = {
+        VERSION: 'X-VERSE-X',
+        URLS: {
+            BASE: 'https://new.chunithm-net.com/chuni-mobile/html/mobile/',
+            CONST_DATA: 'https://reiwa.f5.si/chunithm_record.json',
+            PLAYER_DATA: 'home/playerData/',
+            RANKING: { DETAIL_SEND: 'ranking/sendRankingDetail/' }
+        }
+    };
+    const CURRENT_VERSION = CONSTANTS.VERSION;
+    const BASE_URL = CONSTANTS.URLS.BASE;
+    const CONST_DATA_URL = CONSTANTS.URLS.CONST_DATA;
+    const URL_PLAYER_DATA = BASE_URL + CONSTANTS.URLS.PLAYER_DATA;
     const URL_RATING_DETAIL_BEST = BASE_URL + 'home/playerData/ratingDetailBest/';
     const URL_RATING_DETAIL_RECENT = BASE_URL + 'home/playerData/ratingDetailRecent/';
-    const URL_RANKING_DETAIL_SEND = BASE_URL + 'ranking/sendRankingDetail/';
+    const URL_RANKING_DETAIL_SEND = BASE_URL + CONSTANTS.URLS.RANKING.DETAIL_SEND;
     const MAX_BEST_COUNT = 30;
     const MAX_NEW_COUNT = 20;
     const SONG_DETAIL_DELAY_SEC = 0.5;
+
+    // runtime options (can be changed via UI later)
+    let MATCH_MODE = 'exact'; // 'exact' or 'title'
+    let BEST_CONST_THRESHOLD = 14.5;
+    let NEW_CONST_THRESHOLD = 13.5;
+    let APPLY_CONST_THRESHOLD = true;
 
     const normalizeTitle = (title = '') => String(title)
         .normalize('NFKC')
@@ -308,12 +323,19 @@
             const diffCode = String(song.params?.diff ?? '');
             const diffKey = reverseDiffMap[diffCode];
             if (!diffKey) return null;
-
             const normalizedTitle = normalizeTitle(song.title);
-            let songData = songDataMap.get(`${normalizedTitle}|${diffKey}`);
-            if (!songData) {
+            let songData = null;
+            // match strategy depending on global MATCH_MODE
+            if (MATCH_MODE === 'exact') {
+                songData = songDataMap.get(`${normalizedTitle}|${diffKey}`);
+                if (!songData) {
+                    const candidates = titleMap.get(normalizedTitle) || [];
+                    songData = candidates.find(entry => entry.diff === diffKey) || candidates[0] || null;
+                }
+            } else {
+                // title-only mode: pick first candidate matching title
                 const candidates = titleMap.get(normalizedTitle) || [];
-                songData = candidates.find(entry => entry.diff === diffKey) || candidates[0] || null;
+                songData = candidates[0] || null;
             }
             if (!songData) {
                 // try rematch by params.idx
@@ -341,6 +363,15 @@
                 const matched = { title: songData.title, diff: songData.diff, const: songData.const, img: songData.img };
                 const candidates = (titleMap.get(normalizedTitle) || []).map(c => ({ title: c.title, diff: c.diff, const: c.const }));
                 debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, matched, candidatesCount: candidates.length, params: song.params });
+            }
+
+            // apply const threshold filtering (honor global settings)
+            if (APPLY_CONST_THRESHOLD) {
+                const threshold = (songData.version === CURRENT_VERSION) ? NEW_CONST_THRESHOLD : BEST_CONST_THRESHOLD;
+                if (Number(songData.const) < threshold) {
+                    if (debug) debug.log('enrichSkipConst', { title: songData.title, const: songData.const, threshold, label });
+                    return null;
+                }
             }
 
             return {
