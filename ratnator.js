@@ -290,119 +290,87 @@
         const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
         const reverseDiffMap = { '0': 'BAS', '1': 'ADV', '2': 'EXP', '3': 'MAS', '4': 'ULT' };
         const diffNameMap = { BAS: 'BASIC', ADV: 'ADVANCED', EXP: 'EXPERT', MAS: 'MASTER', ULT: 'ULTIMA' };
-        const songDataMap = new Map();
-        const titleMap = new Map();
 
-        const idxMap = new Map();
-        for (const songData of constData) {
-            if (!songData || !diffMap[songData.diff]) continue;
-            const key = `${normalizeTitle(songData.title)}|${songData.diff}`;
-            if (!songDataMap.has(key)) {
-                songDataMap.set(key, songData);
-            }
+        const matchMode = MATCH_MODE || 'exact';
+        const applyConstThreshold = APPLY_CONST_THRESHOLD;
+        const bestConstThreshold = BEST_CONST_THRESHOLD;
+        const newConstThreshold = NEW_CONST_THRESHOLD;
 
-            const normalizedTitle = normalizeTitle(songData.title);
-            if (!titleMap.has(normalizedTitle)) {
-                titleMap.set(normalizedTitle, []);
-            }
-            titleMap.get(normalizedTitle).push(songData);
-
-            // build idxMap from possible id fields for robust lookup
-            const possibleIdFields = ['idx', 'id', 'music_id', 'musicId', 'mid', 'no', 'song_id'];
-            for (const f of possibleIdFields) {
-                if (songData[f] !== undefined && songData[f] !== null) {
-                    try {
-                        const idStr = String(songData[f]);
-                        if (!idxMap.has(idStr)) idxMap.set(idStr, songData);
-                    } catch (e) { /* ignore */ }
-                }
-            }
+        // build seed map from provided songList
+        const songSeedMap = new Map();
+        if (matchMode === 'exact') {
+            songList.forEach(song => {
+                const diffAbbreviation = reverseDiffMap[String(song.params?.diff)];
+                if (!diffAbbreviation) return;
+                const key = `${normalizeTitle(song.title)}|${diffAbbreviation}`;
+                if (!songSeedMap.has(key)) songSeedMap.set(key, song);
+            });
+        } else {
+            songList.forEach(song => {
+                const nTitle = normalizeTitle(song.title);
+                if (!songSeedMap.has(nTitle)) songSeedMap.set(nTitle, song);
+            });
         }
 
-        const enriched = songList.map(song => {
-            const diffCode = String(song.params?.diff ?? '');
-            const diffKey = reverseDiffMap[diffCode];
-            if (!diffKey) return null;
-            const normalizedTitle = normalizeTitle(song.title);
-            let songData = null;
-            // match strategy depending on global MATCH_MODE
-            if (MATCH_MODE === 'exact') {
-                songData = songDataMap.get(`${normalizedTitle}|${diffKey}`);
-                if (!songData) {
-                    const candidates = titleMap.get(normalizedTitle) || [];
-                    songData = candidates.find(entry => entry.diff === diffKey) || candidates[0] || null;
-                }
+        const enriched = [];
+
+        for (const songData of constData) {
+            if (!songData || !diffMap[songData.diff]) continue;
+
+            const isNewSong = songData.version === CURRENT_VERSION;
+
+            if (applyConstThreshold) {
+                const threshold = isNewSong ? newConstThreshold : bestConstThreshold;
+                if (Number(songData.const) < threshold) continue;
+            }
+
+            let initialSong = null;
+            if (matchMode === 'exact') {
+                const key = `${normalizeTitle(songData.title)}|${songData.diff}`;
+                initialSong = songSeedMap.get(key);
             } else {
-                // title-only mode: pick first candidate matching title
-                const candidates = titleMap.get(normalizedTitle) || [];
-                songData = candidates[0] || null;
-            }
-            if (!songData) {
-                // try rematch by params.idx
-                const paramIdx = song.params?.idx ? String(song.params.idx) : null;
-                if (paramIdx && idxMap.has(paramIdx)) {
-                    songData = idxMap.get(paramIdx);
-                    if (debug) debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, rematchBy: 'idx', paramIdx, matched: { title: songData.title, diff: songData.diff, const: songData.const }, params: song.params });
-                } else {
-                    if (debug) debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, matched: null, candidates: (titleMap.get(normalizedTitle) || []).length, params: song.params });
-                    return null;
-                }
+                initialSong = songSeedMap.get(normalizeTitle(songData.title));
             }
 
-            // if matched by title but idx differs, log candidate idx values
-            if (debug) {
-                const matched = { title: songData.title, diff: songData.diff, const: songData.const, img: songData.img };
-                const candidates = (titleMap.get(normalizedTitle) || []).map(c => ({ title: c.title, diff: c.diff, const: c.const }));
-                // find any id value
-                const ids = [];
-                ['idx', 'id', 'music_id', 'musicId', 'mid', 'no', 'song_id'].forEach(k => { if (songData[k] !== undefined) ids.push({ [k]: songData[k] }); });
-                debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, matched, ids, candidatesCount: candidates.length, params: song.params });
-            }
+            if (!initialSong) continue;
 
-            if (debug) {
-                const matched = { title: songData.title, diff: songData.diff, const: songData.const, img: songData.img };
-                const candidates = (titleMap.get(normalizedTitle) || []).map(c => ({ title: c.title, diff: c.diff, const: c.const }));
-                debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, matched, candidatesCount: candidates.length, params: song.params });
-            }
+            const scoreInt = (matchMode === 'exact' && Number.isFinite(initialSong.score_int)) ? initialSong.score_int : 0;
+            if (matchMode === 'exact' && scoreInt <= 0) continue; // paid mode: skip if no score
 
-            // apply const threshold filtering (honor global settings)
-            if (APPLY_CONST_THRESHOLD) {
-                const threshold = (songData.version === CURRENT_VERSION) ? NEW_CONST_THRESHOLD : BEST_CONST_THRESHOLD;
-                if (Number(songData.const) < threshold) {
-                    if (debug) debug.log('enrichSkipConst', { title: songData.title, const: songData.const, threshold, label });
-                    return null;
-                }
-            }
+            const params = matchMode === 'exact'
+                ? initialSong.params
+                : { ...initialSong.params, diff: diffMap[songData.diff] };
 
-            return {
+            const songObject = {
                 title: songData.title,
                 artist: songData.artist,
                 difficulty: diffNameMap[songData.diff],
                 const: Number(songData.const),
-                score_int: Number(song.score_int) || 0,
-                score_str: song.score_str || '',
-                playCount: song.playCount || 'N/A',
-                detailSendUrl: song.detailSendUrl || '',
-                params: song.params,
+                score_int: scoreInt,
+                score_str: (matchMode === 'exact' && initialSong.score_str) ? initialSong.score_str : '',
+                playCount: 'N/A',
+                params: params,
+                detailSendUrl: initialSong.detailSendUrl || '',
                 jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/html/mobile/img/${songData.img}.jpg` : '',
             };
-        }).filter(Boolean);
 
-        if (debug) {
-            debug.log('enrich', {
-                label,
-                inputCount: songList.length,
-                outputCount: enriched.length,
-                sampleInput: songList.slice(0, 3).map(song => ({ title: song.title, diff: song.params?.diff, score_int: song.score_int })),
-                sampleOutput: enriched.slice(0, 3).map(song => ({ title: song.title, difficulty: song.difficulty, const: song.const })),
-            });
+            if (matchMode === 'exact' && scoreInt > 0) {
+                songObject.rating = calculateRating(scoreInt, songObject.const);
+            }
+
+            enriched.push(songObject);
         }
 
-        try {
-            if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(20, `Enriched ${label}: ${enriched.length}曲`);
-        } catch (e) { }
+        // dedupe by title + difficulty
+        const unique = enriched.filter((s, i, arr) => i === arr.findIndex(x => x.title === s.title && x.difficulty === s.difficulty));
 
-        return enriched;
+        if (debug) {
+            debug.log('enrich', { label, inputCount: songList.length, outputCount: unique.length, sampleOutput: unique.slice(0, 3).map(s => ({ title: s.title, difficulty: s.difficulty, const: s.const })) });
+        }
+
+        try { if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(20, `Enriched ${label}: ${unique.length}曲`); } catch (e) { }
+
+        return unique;
     };
 
     const fetchRatingDetailSongSeeds = async (pageUrl, debug = null, label = '') => {
