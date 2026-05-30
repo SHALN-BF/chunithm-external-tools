@@ -499,8 +499,9 @@
         closeButton.textContent = '閉じる';
         closeButton.style.cssText = 'appearance:none; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03); color:#f6f9ff; padding:8px 12px; border-radius:999px; cursor:pointer;';
 
-        const body = document.createElement('pre');
-        body.style.cssText = 'white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; color:#e7f1ff;';
+        const body = document.createElement('div');
+        body.id = 'ratnator-body';
+        body.style.cssText = 'font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif; font-size:13px; color:#e7f1ff; line-height:1.4;';
 
         header.appendChild(closeButton);
         panel.appendChild(header);
@@ -537,57 +538,71 @@
         ].join('\n');
     };
 
-    const renderTextReport = (player, bestList, newList) => {
+    const renderHtmlReport = (player, bestList, newList) => {
         const bestAvg = calculateAverageRating(bestList);
         const newAvg = calculateAverageRating(newList);
-        const lines = [];
-        const currentRatingText = Number(player.rating).toFixed(2);
-        const overPowerText = player.overPower ? player.overPower : '取得できませんでした';
-        const playCountText = player.playCount || '取得できませんでした';
-        const currentPlayCountText = player.currentPlayCount || '取得できませんでした';
 
-        lines.push('CHUNITHM Ratnator');
-        lines.push(`ユーザー名: ${player.name}`);
-        lines.push(`フレンドコード: ${player.code || '-'}`);
-        lines.push(`現在レーティング: ${currentRatingText}`);
-        lines.push(`総プレイ回数: ${playCountText}`);
-        lines.push(`現在プレイ回数: ${currentPlayCountText}`);
-        lines.push(`Best Ave: ${bestAvg.toFixed(4)}`);
-        lines.push(`New Ave: ${newAvg.toFixed(4)}`);
-        lines.push(`OverPower: ${overPowerText}`);
-        lines.push(`出力時刻: ${new Date().toLocaleString('ja-JP')}`);
-        lines.push('');
-        lines.push(`【BEST枠 ${bestList.length}件】`);
+        const headerHtml = `
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px;">
+                <div>
+                    <div style="font-size:13px;color:#8cb4ff;font-weight:700;">CHUNITHM Ratnator</div>
+                    <div style="font-size:16px;color:#e7f1ff;font-weight:700;">ユーザー: ${escapeHtml(player.name)} &nbsp; <small style=\"color:#9fbfff;\">(${escapeHtml(player.code || '-')})</small></div>
+                    <div style="font-size:12px;color:#cfe8ff; margin-top:6px;">現在レーティング: <strong style=\"color:#8df0c9;\">${Number(player.rating).toFixed(2)}</strong></div>
+                </div>
+                <div style="text-align:right; color:#cfe8ff; font-size:12px;">
+                    <div>Best Ave: <strong>${bestAvg.toFixed(4)}</strong></div>
+                    <div>New Ave: <strong>${newAvg.toFixed(4)}</strong></div>
+                    <div style="margin-top:6px; font-size:11px; color:#9fbfff;">出力: ${new Date().toLocaleString('ja-JP')}</div>
+                </div>
+            </div>
+        `;
 
-        if (bestList.length === 0) {
-            lines.push('  該当曲なし');
-        } else {
-            bestList.forEach((song, index) => {
-                lines.push(formatSongLine(song, index));
-                if (index !== bestList.length - 1) {
-                    lines.push('');
-                }
-            });
-        }
+        const makeTable = (list) => {
+            if (!list || list.length === 0) return '<div style="color:#cfe8ff;">該当曲なし</div>';
+            let rows = list.map((song, idx) => {
+                const rankInfo = getRankInfo(song.score_int);
+                const scoreText = song.score_str || song.score_int.toLocaleString('en-US');
+                const ratingText = Number.isFinite(song.rating) ? song.rating.toFixed(2) : '-';
+                const constText = Number.isFinite(song.const) ? song.const.toFixed(2) : '-';
+                const playCountText = song.playCount && song.playCount !== 'N/A' ? escapeHtml(String(song.playCount)) : '-';
+                const jacket = song.jacketUrl ? `<img src="${song.jacketUrl}" style="width:48px;height:48px;border-radius:6px;object-fit:cover;margin-right:8px;">` : '';
+                return `
+                    <tr>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.04);">${idx + 1}</td>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.04); display:flex; align-items:center; gap:8px;">${jacket}<div><div style="font-weight:700;color:#e7f1ff;">${escapeHtml(song.title)}</div><div style="font-size:12px;color:#9fbfff;">${escapeHtml(song.artist || '')}</div></div></td>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.04);">${escapeHtml(song.difficulty)}</td>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.04); text-align:right;">${constText}</td>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.04); text-align:right;">${scoreText}</td>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.04); text-align:center;">${rankInfo.rank}</td>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.04); text-align:right;">${ratingText}</td>
+                        <td style="padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.04); text-align:right;">${playCountText}</td>
+                    </tr>
+                `;
+            }).join('');
 
-        lines.push('');
-        lines.push(`【NEW枠 ${newList.length}件】`);
+            return `
+                <table style="width:100%; border-collapse:collapse; margin-top:8px;">
+                    <thead><tr style="color:#9fbfff; font-size:12px; text-align:left;"><th style="padding:8px 10px; width:48px;">No</th><th style="padding:8px 10px;">Title</th><th style="padding:8px 10px; width:92px;">Diff</th><th style="padding:8px 10px; width:76px; text-align:right;">Const</th><th style="padding:8px 10px; width:110px; text-align:right;">Score</th><th style="padding:8px 10px; width:64px; text-align:center;">Rank</th><th style="padding:8px 10px; width:84px; text-align:right;">Rating</th><th style="padding:8px 10px; width:84px; text-align:right;">Play</th></tr></thead>
+                    <tbody style="color:#e7f1ff; font-size:13px;">${rows}</tbody>
+                </table>
+            `;
+        };
 
-        if (newList.length === 0) {
-            lines.push('  該当曲なし');
-        } else {
-            newList.forEach((song, index) => {
-                lines.push(formatSongLine(song, index));
-                if (index !== newList.length - 1) {
-                    lines.push('');
-                }
-            });
-        }
-
-        // no debug output in production report
-
-        return lines.join('\n');
+        const html = `
+            ${headerHtml}
+            <div style="margin-top:8px;">
+                <div style="margin-bottom:8px; font-weight:700; color:#8cb4ff;">BEST枠 (${bestList.length})</div>
+                ${makeTable(bestList)}
+            </div>
+            <div style="margin-top:18px;">
+                <div style="margin-bottom:8px; font-weight:700; color:#8cb4ff;">NEW枠 (${newList.length})</div>
+                ${makeTable(newList)}
+            </div>
+        `;
+        return html;
     };
+
+    const escapeHtml = (str) => String(str || '').replace(/[&<>"']/g, (s) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": "&#39;" })[s]);
 
     // renderHtmlReport removed in simplified build
 
@@ -639,8 +654,8 @@
             const bestList = frameLists.best;
             const newList = frameLists.recent;
 
-            reportText = renderTextReport(player, bestList, newList);
-            overlayRefs.body.textContent = reportText;
+            const reportHtml = renderHtmlReport(player, bestList, newList);
+            overlayRefs.body.innerHTML = reportHtml;
             overlayRefs.statusEl.innerHTML = `ユーザー: <span style="color:#8df0c9;">${player.name}</span>`;
         } catch (error) {
             console.error(error);
