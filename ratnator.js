@@ -15,6 +15,7 @@
     const URL_RANKING_DETAIL_SEND = BASE_URL + 'ranking/sendRankingDetail/';
     const MAX_BEST_COUNT = 30;
     const MAX_NEW_COUNT = 20;
+    const SONG_DETAIL_DELAY_SEC = 0.5;
 
     const normalizeTitle = (title = '') => title
         .replace(/\u3000/g, ' ')
@@ -565,7 +566,7 @@
             const constData = await fetch(CONST_DATA_URL).then(response => response.json());
             overlayRefs.statusEl.innerHTML += '<br>定数データを取得しました';
 
-            const paidResult = await fetchAllSongsForPaidUserViaRecord(0, constData);
+            const paidResult = await fetchAllSongsForPaidUserViaRecord(SONG_DETAIL_DELAY_SEC, constData);
             const detailedOldSongs = paidResult.detailedOldSongs;
             const detailedNewSongs = paidResult.detailedNewSongs;
 
