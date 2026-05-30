@@ -26,8 +26,9 @@
     const MAX_NEW_COUNT = 20;
     const SONG_DETAIL_DELAY_SEC = 0.5;
 
-    // runtime options (can be changed via UI later)
-    let MATCH_MODE = 'exact'; // 'exact' or 'title'
+    // === Runtime options (can be changed via UI later) ===
+    // MATCH_MODE: 'exact' (title+diff), 'title' (title-only)
+    let MATCH_MODE = 'exact';
     let BEST_CONST_THRESHOLD = 14.5;
     let NEW_CONST_THRESHOLD = 13.5;
     let APPLY_CONST_THRESHOLD = true;
@@ -43,17 +44,7 @@
 
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    const createDiagnostics = () => {
-        const entries = [];
-        return {
-            entries,
-            log(step, data = {}) {
-                const entry = { step, ...data };
-                entries.push(entry);
-                console.log('[Ratnator]', step, data);
-            },
-        };
-    };
+    // diagnostics helper removed in production build
 
     const fetchDocument = async (url, options = {}) => {
         const response = await fetch(url, options);
@@ -70,16 +61,17 @@
         return new DOMParser().parseFromString(htmlText, 'text/html');
     };
 
+    /**
+     * Parse a score-like string and return numeric value.
+     * Prefers matches of 6+ digits to avoid picking up small numbers.
+     * @param {string} text
+     * @returns {{scoreStr:string, scoreInt:number}}
+     */
     const parseScoreFromText = (text) => {
-        if (!text) {
-            return { scoreStr: '', scoreInt: 0 };
-        }
+        if (!text) return { scoreStr: '', scoreInt: 0 };
         const normalized = String(text).replace(/\s+/g, '');
-        // require at least 6 digits (score-like) to avoid picking up small numbers
         const match = normalized.match(/\d[\d,]{5,}/);
-        if (!match) {
-            return { scoreStr: '', scoreInt: 0 };
-        }
+        if (!match) return { scoreStr: '', scoreInt: 0 };
         const scoreStr = match[0];
         const scoreInt = parseInt(scoreStr.replace(/,/g, ''), 10) || 0;
         return { scoreStr, scoreInt };
@@ -148,6 +140,12 @@
         return total / list.length;
     };
 
+    /**
+     * Try an array of selectors on a root and return the first non-empty text.
+     * @param {Document|Element} root
+     * @param {string|string[]} selectors
+     * @returns {string}
+     */
     const getTextFromSelectors = (root, selectors) => {
         const list = Array.isArray(selectors) ? selectors : [selectors];
         for (const sel of list) {
@@ -157,13 +155,18 @@
                     const t = (el.innerText || el.textContent || '').trim();
                     if (t) return t;
                 }
-            } catch (e) {
-                // invalid selector - ignore
-            }
+            } catch (e) { /* ignore invalid selectors */ }
         }
         return '';
     };
 
+    /**
+     * Find numeric text near labels matching the provided patterns.
+     * Used as a fallback when selector-based extraction fails.
+     * @param {Document|Element} root
+     * @param {RegExp|RegExp[]} labelPatterns
+     * @returns {string}
+     */
     const extractTextByLabel = (root, labelPatterns) => {
         const patterns = Array.isArray(labelPatterns) ? labelPatterns : [labelPatterns];
         const nodes = root.querySelectorAll('*');
@@ -173,18 +176,14 @@
             if (!patterns.some(pattern => pattern.test(text))) continue;
 
             const numbers = text.match(/\d[\d,]{5,}(?:\.\d+)?/g) || text.match(/\d[\d,]*(?:\.\d+)?/g);
-            if (numbers && numbers.length) {
-                return numbers[numbers.length - 1];
-            }
+            if (numbers && numbers.length) return numbers[numbers.length - 1];
 
             const neighbors = [node.nextElementSibling, node.parentElement?.nextElementSibling];
             for (const neighbor of neighbors) {
                 if (!neighbor) continue;
                 const neighborText = (neighbor.textContent || neighbor.innerText || '').replace(/\s+/g, ' ').trim();
                 const neighborNumbers = neighborText.match(/\d[\d,]{5,}(?:\.\d+)?/g) || neighborText.match(/\d[\d,]*(?:\.\d+)?/g);
-                if (neighborNumbers && neighborNumbers.length) {
-                    return neighborNumbers[neighborNumbers.length - 1];
-                }
+                if (neighborNumbers && neighborNumbers.length) return neighborNumbers[neighborNumbers.length - 1];
             }
         }
         return '';
@@ -309,7 +308,7 @@
         };
     };
 
-    const enrichSongsWithConstData = (constData, songList, debug = null, label = '') => {
+    const enrichSongsWithConstData = (constData, songList, label = '') => {
         const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
         const reverseDiffMap = { '0': 'BAS', '1': 'ADV', '2': 'EXP', '3': 'MAS', '4': 'ULT' };
         const diffNameMap = { BAS: 'BASIC', ADV: 'ADVANCED', EXP: 'EXPERT', MAS: 'MASTER', ULT: 'ULTIMA' };
@@ -404,28 +403,23 @@
             matchedCount++;
         }
 
-        if (debug) {
-            debug.log('enrichStats', { label, totalConst, matchedCount, skippedByThreshold, skippedNoMatch, skippedNoScore, skippedSamples });
-        } else {
-            console.info('[Ratnator] Enrich stats', { label, totalConst, matchedCount, skippedByThreshold, skippedNoMatch, skippedNoScore });
-            if (skippedByThreshold > 0 || skippedNoMatch > 0 || skippedNoScore > 0) {
-                console.info('[Ratnator] Skipped samples:', skippedSamples);
-            }
+        console.info('[Ratnator] Enrich stats', { label, totalConst, matchedCount, skippedByThreshold, skippedNoMatch, skippedNoScore });
+        if (skippedByThreshold > 0 || skippedNoMatch > 0 || skippedNoScore > 0) {
+            console.info('[Ratnator] Skipped samples:', skippedSamples);
         }
 
         // dedupe by title + difficulty
         const unique = enriched.filter((s, i, arr) => i === arr.findIndex(x => x.title === s.title && x.difficulty === s.difficulty));
 
-        if (debug) {
-            debug.log('enrich', { label, inputCount: songList.length, outputCount: unique.length, sampleOutput: unique.slice(0, 3).map(s => ({ title: s.title, difficulty: s.difficulty, const: s.const })) });
-        }
+        // enrichment summary
+        // (no debug logs in production)
 
         try { if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(20, `Enriched ${label}: ${unique.length}曲`); } catch (e) { }
 
         return unique;
     };
 
-    const fetchRatingDetailSongSeeds = async (pageUrl, debug = null, label = '') => {
+    const fetchRatingDetailSongSeeds = async (pageUrl, label = '') => {
         const doc = await fetchDocument(pageUrl);
         const songForms = doc.querySelectorAll('form[action$="sendMusicDetail/"]');
         const initialSongList = [];
@@ -449,13 +443,7 @@
             });
         });
 
-        if (debug) {
-            debug.log('seed', {
-                label,
-                count: initialSongList.length,
-                sample: initialSongList.slice(0, 3).map(song => ({ title: song.title, diff: song.params?.diff, score_int: song.score_int })),
-            });
-        }
+        console.info('[Ratnator] seed', { label, count: initialSongList.length });
 
         try {
             if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(5, `Seeds ${label}: ${initialSongList.length}曲`);
@@ -464,7 +452,7 @@
         return initialSongList;
     };
 
-    const processSongList = async (list, delay, debug = null, label = '') => {
+    const processSongList = async (list, delay, label = '') => {
         const detailedSongs = [];
         let successCount = 0;
         let failCount = 0;
@@ -506,28 +494,16 @@
                 const scoreInt = detailScoreInt > 0 ? detailScoreInt : seedScoreInt;
                 const scoreStr = detailStats.scoreStr || song.score_str || '';
                 if (!Number.isFinite(scoreInt) || scoreInt <= 0) {
-                    if (debug) debug.log('songDetail', { title: song.title, seedScoreInt, detailScoreInt, usedScoreInt: scoreInt, note: 'invalid score, skipped' });
+                    // invalid score, skip
                     continue;
                 }
 
-                // detailed debug logging: raw texts and params
-                if (debug) {
-                    debug.log('detailFetch', {
-                        title: song.title,
-                        params: song.params,
-                        seedScoreInt,
-                        detailScoreInt,
-                        rawScoreText: detailStats.rawScoreText,
-                        rawScoreHtml: detailStats.rawScoreHtml,
-                    });
-                } else {
-                    // always log large deltas to console for visibility
-                    const delta = Math.abs((detailScoreInt || 0) - (seedScoreInt || 0));
-                    if (delta >= 10000) {
-                        console.warn('[Ratnator] Large score delta', { title: song.title, seedScoreInt, detailScoreInt, delta, params: song.params });
-                        console.log(' rawScoreText:', detailStats.rawScoreText);
-                        console.log(' rawScoreHtml:', detailStats.rawScoreHtml);
-                    }
+                // Log large deltas for visibility
+                const delta = Math.abs((detailScoreInt || 0) - (seedScoreInt || 0));
+                if (delta >= 10000) {
+                    console.warn('[Ratnator] Large score delta', { title: song.title, seedScoreInt, detailScoreInt, delta, params: song.params });
+                    console.log(' rawScoreText:', detailStats.rawScoreText);
+                    console.log(' rawScoreHtml:', detailStats.rawScoreHtml);
                 }
 
                 successCount++;
@@ -539,7 +515,7 @@
                     score_int: scoreInt,
                     playCount: detailStats.playCount || song.playCount || 'N/A',
                 });
-                if (debug) debug.log('songDetail', { title: song.title, seedScoreInt, detailScoreInt: Number(detailStats.scoreInt) || 0, usedScoreInt: scoreInt, rawScoreText: detailStats.rawScoreText, rawScoreHtml: detailStats.rawScoreHtml });
+                // no-op: production build does not emit per-song debug logs
                 try {
                     if (window.__ratnatorUpdateProgress) {
                         const p = Math.round(((i + 1) / Math.max(1, list.length)) * 100);
@@ -558,7 +534,7 @@
                         score_int: Number(song.score_int),
                         playCount: song.playCount || 'N/A',
                     });
-                    if (debug) debug.log('songDetail', { title: song.title, seedScoreInt: Number(song.score_int) || 0, detailScoreInt: null, usedScoreInt: Number(song.score_int) || 0, note: 'detail fetch failed, used seed' });
+                    // detail fetch failed, used seed (no per-song debug in production)
                     try {
                         if (window.__ratnatorUpdateProgress) {
                             const p = Math.round(((i + 1) / Math.max(1, list.length)) * 100);
@@ -569,31 +545,21 @@
             }
         }
 
-        if (debug) {
-            debug.log('detail', {
-                label,
-                inputCount: list.length,
-                outputCount: detailedSongs.length,
-                successCount,
-                failCount,
-                sampleOutput: detailedSongs.slice(0, 3).map(song => ({ title: song.title, score_int: song.score_int, const: song.const })),
-            });
-        }
+        console.info('[Ratnator] detail', { label, inputCount: list.length, outputCount: detailedSongs.length, successCount, failCount });
         try { if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(60, `${label} 完了`); } catch (e) { }
 
         return detailedSongs;
     };
 
     const fetchAllSongsForPaidUserViaRecord = async (delay, constData, options = {}) => {
-        const { debug = null } = options;
-        const bestSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_BEST, debug, 'BEST seed page');
-        const recentSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_RECENT, debug, 'NEW seed page');
+        const bestSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_BEST, 'BEST seed page');
+        const recentSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_RECENT, 'NEW seed page');
 
-        const enrichedOldSongs = enrichSongsWithConstData(constData, bestSeeds, debug, 'BEST');
-        const enrichedNewSongs = enrichSongsWithConstData(constData, recentSeeds, debug, 'NEW');
+        const enrichedOldSongs = enrichSongsWithConstData(constData, bestSeeds, 'BEST');
+        const enrichedNewSongs = enrichSongsWithConstData(constData, recentSeeds, 'NEW');
 
-        const detailedOldSongs = await processSongList(enrichedOldSongs, delay, debug, 'BEST detail');
-        const detailedNewSongs = await processSongList(enrichedNewSongs, delay, debug, 'NEW detail');
+        const detailedOldSongs = await processSongList(enrichedOldSongs, delay, 'BEST detail');
+        const detailedNewSongs = await processSongList(enrichedNewSongs, delay, 'NEW detail');
 
         detailedNewSongs.forEach(song => {
             song.rating = calculateRating(song.score_int, song.const);
@@ -1083,8 +1049,7 @@
         }
 
         const overlayRefs = createOverlay();
-        const diagnostics = createDiagnostics();
-        window.__ratnatorDebug = diagnostics.entries;
+        // diagnostics removed in production build
         overlayRefs.statusEl.textContent = 'プレイヤー情報を取得中...';
         overlayRefs.body.textContent = '読み込み中...';
 
