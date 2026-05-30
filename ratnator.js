@@ -17,7 +17,8 @@
     const MAX_NEW_COUNT = 20;
     const SONG_DETAIL_DELAY_SEC = 0.5;
 
-    const normalizeTitle = (title = '') => title
+    const normalizeTitle = (title = '') => String(title)
+        .normalize('NFKC')
         .replace(/\u3000/g, ' ')
         .replace(/[\s\u200B-\u200D\uFEFF]+/g, ' ')
         .replace(/[’]/g, "'")
@@ -258,6 +259,7 @@
         const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
         const diffNameMap = { BAS: 'BASIC', ADV: 'ADVANCED', EXP: 'EXPERT', MAS: 'MASTER', ULT: 'ULTIMA' };
         const songDataMap = new Map();
+        const titleMap = new Map();
 
         for (const songData of constData) {
             if (!songData || !diffMap[songData.diff]) continue;
@@ -265,6 +267,12 @@
             if (!songDataMap.has(key)) {
                 songDataMap.set(key, songData);
             }
+
+            const normalizedTitle = normalizeTitle(songData.title);
+            if (!titleMap.has(normalizedTitle)) {
+                titleMap.set(normalizedTitle, []);
+            }
+            titleMap.get(normalizedTitle).push(songData);
         }
 
         return songList.map(song => {
@@ -272,7 +280,12 @@
             const diffKey = diffMap[diffCode];
             if (!diffKey) return null;
 
-            const songData = songDataMap.get(`${normalizeTitle(song.title)}|${diffKey}`);
+            const normalizedTitle = normalizeTitle(song.title);
+            let songData = songDataMap.get(`${normalizedTitle}|${diffKey}`);
+            if (!songData) {
+                const candidates = titleMap.get(normalizedTitle) || [];
+                songData = candidates.find(entry => entry.diff === diffKey) || candidates[0] || null;
+            }
             if (!songData) return null;
 
             return {
