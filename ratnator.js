@@ -47,7 +47,7 @@
             return { scoreStr: '', scoreInt: 0 };
         }
         const normalized = String(text).replace(/\s+/g, '');
-        const match = normalized.match(/\d[\d,]{5,}/);
+        const match = normalized.match(/\d[\d,]*/);
         if (!match) {
             return { scoreStr: '', scoreInt: 0 };
         }
@@ -147,7 +147,11 @@
 
     const extractMusicDetailStats = (root) => {
         const scoreElement = root.querySelector('.musicdata_score_num .text_b, .rank_playdata_highscore .text_b, .play_musicdata_highscore .text_b');
-        const scoreText = scoreElement?.innerText?.trim() || '';
+        const scoreText = scoreElement?.innerText?.trim() || extractTextByLabel(root, [
+            /HIGH\s*SCORE/i,
+            /SCORE/i,
+            /スコア/i,
+        ]);
         const parsedScore = parseScoreFromText(scoreText);
 
         const playCountBlock = Array.from(root.querySelectorAll('.block_underline')).find(block => /プレイ回数/i.test(block.textContent || ''));
@@ -163,6 +167,15 @@
             scoreStr: parsedScore.scoreStr,
             scoreInt: parsedScore.scoreInt,
             playCount: playCountText,
+        };
+    };
+
+    const extractSeedDetailStats = (root) => {
+        const detailStats = extractMusicDetailStats(root);
+        return {
+            score_str: detailStats.scoreStr,
+            score_int: detailStats.scoreInt,
+            playCount: detailStats.playCount,
         };
     };
 
@@ -284,6 +297,7 @@
 
         songForms.forEach(form => {
             const title = form.querySelector('.music_title')?.innerText?.trim();
+            const seedStats = extractSeedDetailStats(form);
             const params = {};
             form.querySelectorAll('input[name]').forEach(input => {
                 params[input.name] = input.value || '';
@@ -294,9 +308,9 @@
                 title,
                 detailSendUrl: form.getAttribute('action') ? new URL(form.getAttribute('action'), window.location.origin).href : '',
                 params,
-                score_str: '',
-                score_int: 0,
-                playCount: 'N/A',
+                score_str: seedStats.score_str,
+                score_int: seedStats.score_int,
+                playCount: seedStats.playCount || 'N/A',
             });
         });
 
@@ -321,8 +335,9 @@
                 });
 
                 const detailStats = extractMusicDetailStats(detailDoc);
-                const scoreInt = Number(detailStats.scoreInt);
-                const scoreStr = detailStats.scoreStr || '';
+                const seedScoreInt = Number(song.score_int) || 0;
+                const scoreInt = Number(detailStats.scoreInt) > 0 ? Number(detailStats.scoreInt) : seedScoreInt;
+                const scoreStr = detailStats.scoreStr || song.score_str || '';
                 if (!Number.isFinite(scoreInt) || scoreInt <= 0) continue;
 
                 detailedSongs.push({
@@ -333,6 +348,14 @@
                 });
             } catch (error) {
                 console.warn(`スコア取得失敗: ${song.title}`, error);
+                if (Number(song.score_int) > 0) {
+                    detailedSongs.push({
+                        ...song,
+                        score_str: song.score_str || String(song.score_int),
+                        score_int: Number(song.score_int),
+                        playCount: song.playCount || 'N/A',
+                    });
+                }
             }
         }
 
