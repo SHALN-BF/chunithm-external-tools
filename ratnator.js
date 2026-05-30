@@ -739,7 +739,7 @@
         ].join('\n');
     };
 
-    const renderTextReport = (player, bestList, newList, diagnostics = []) => {
+    const renderTextReport = (player, bestList, newList) => {
         const bestAvg = calculateAverageRating(bestList);
         const newAvg = calculateAverageRating(newList);
         const lines = [];
@@ -786,20 +786,12 @@
             });
         }
 
-        if (diagnostics.length > 0) {
-            lines.push('');
-            lines.push('【DEBUG】');
-            diagnostics.forEach(entry => {
-                const payload = { ...entry };
-                delete payload.step;
-                lines.push(`${entry.step}: ${JSON.stringify(payload)}`);
-            });
-        }
+        // no debug output in production report
 
         return lines.join('\n');
     };
 
-    const renderHtmlReport = (player, bestList, newList, diagnostics = []) => {
+    const renderHtmlReport = (player, bestList, newList) => {
         const bestRows = bestList.map((song, idx) => {
             const rankInfo = getRankInfo(song.score_int);
             const playCountText = song.playCount && song.playCount !== 'N/A' ? song.playCount : 'N/A';
@@ -979,12 +971,7 @@
         // append diff table
         const finalHtml = html + diffTableHtml;
 
-        let debugHtml = '';
-        if (diagnostics && diagnostics.length) {
-            debugHtml = '<div style="margin-top:12px; color:#9fb7d9;"><strong>DEBUG</strong><pre style="white-space:pre-wrap;">' + escapeHtml(JSON.stringify(diagnostics, null, 2)) + '</pre></div>';
-        }
-
-        return finalHtml + debugHtml;
+        return finalHtml;
     };
 
     const escapeHtml = (str) => {
@@ -1064,33 +1051,22 @@
         try {
             const playerDoc = await fetchDocument(URL_PLAYER_DATA);
             const player = parsePlayerInfo(playerDoc);
-            diagnostics.log('player', {
-                name: player.name,
-                rating: player.rating,
-                overPower: player.overPower,
-                playCount: player.playCount,
-                currentPlayCount: player.currentPlayCount,
-            });
             overlayRefs.statusEl.innerHTML = `ユーザー: <span style="color:#8df0c9;">${player.name}</span><br>レーティングを解析しました`;
 
             const constData = await fetch(CONST_DATA_URL).then(response => response.json());
-            diagnostics.log('const', { count: Array.isArray(constData) ? constData.length : 0 });
             overlayRefs.statusEl.innerHTML += '<br>定数データを取得しました';
 
-            const paidResult = await fetchAllSongsForPaidUserViaRecord(SONG_DETAIL_DELAY_SEC, constData, { debug: diagnostics });
+            const paidResult = await fetchAllSongsForPaidUserViaRecord(SONG_DETAIL_DELAY_SEC, constData);
             const detailedOldSongs = paidResult.detailedOldSongs;
             const detailedNewSongs = paidResult.detailedNewSongs;
 
-            diagnostics.log('final', {
-                bestCount: detailedOldSongs.length,
-                newCount: detailedNewSongs.length,
-            });
+            // final counts logged
 
             const frameLists = buildFrameLists(detailedOldSongs, detailedNewSongs);
             const bestList = frameLists.best;
             const newList = frameLists.recent;
-            reportText = renderTextReport(player, bestList, newList, diagnostics.entries);
-            overlayRefs.body.innerHTML = renderHtmlReport(player, bestList, newList, diagnostics.entries);
+            reportText = renderTextReport(player, bestList, newList);
+            overlayRefs.body.innerHTML = renderHtmlReport(player, bestList, newList);
             overlayRefs.statusEl.innerHTML = `
                 ユーザー: <span style="color:#8df0c9;">${player.name}</span><br>
                 現在レーティング: <span style="color:#7bb8ff;">${Number(player.rating).toFixed(2)}</span><br>
