@@ -31,7 +31,7 @@
     let MATCH_MODE = 'exact';
     let BEST_CONST_THRESHOLD = 14.5;
     let NEW_CONST_THRESHOLD = 13.5;
-    let APPLY_CONST_THRESHOLD = true;
+    let APPLY_CONST_THRESHOLD = false;
 
     const normalizeTitle = (title = '') => String(title)
         .normalize('NFKC')
@@ -323,15 +323,14 @@
 
     const enrichSongsWithConstData = (constData, songList, label = '') => {
         const diffMap = { BAS: '0', ADV: '1', EXP: '2', MAS: '3', ULT: '4' };
-        const reverseDiffMap = { '0': 'BAS', '1': 'ADV', '2': 'EXP', '3': 'MAS', '4': 'ULT' };
         const diffNameMap = { BAS: 'BASIC', ADV: 'ADVANCED', EXP: 'EXPERT', MAS: 'MASTER', ULT: 'ULTIMA' };
+        const reverseDiffMap = { '0': 'BAS', '1': 'ADV', '2': 'EXP', '3': 'MAS', '4': 'ULT' };
 
         const matchMode = MATCH_MODE || 'exact';
         const applyConstThreshold = APPLY_CONST_THRESHOLD;
         const bestConstThreshold = BEST_CONST_THRESHOLD;
         const newConstThreshold = NEW_CONST_THRESHOLD;
 
-        // build seed map from provided songList
         const songSeedMap = new Map();
         if (matchMode === 'exact') {
             songList.forEach(song => {
@@ -341,19 +340,24 @@
                 if (!songSeedMap.has(key)) songSeedMap.set(key, song);
             });
         } else {
-            songList.forEach(song => {
-                const nTitle = normalizeTitle(song.title);
-                if (!songSeedMap.has(nTitle)) songSeedMap.set(nTitle, song);
+            songList.forEach(s => {
+                const nTitle = normalizeTitle(s.title);
+                if (!songSeedMap.has(nTitle)) songSeedMap.set(nTitle, s);
             });
         }
 
-        const enriched = [];
+        const rawNewSongs = [];
+        const rawOldSongs = [];
+
         let totalConst = 0;
         let skippedByThreshold = 0;
         let skippedNoMatch = 0;
         let skippedNoScore = 0;
         const skippedSamples = [];
-        let matchedCount = 0;
+
+        try {
+            console.info('[Ratnator][Diagnostics] enrich start', { label, matchMode, applyConstThreshold, bestConstThreshold, newConstThreshold, seedMapSize: songSeedMap.size, seedListCount: songList.length, constDataCount: constData.length });
+        } catch (e) { }
 
         for (const songData of constData) {
             totalConst++;
@@ -385,11 +389,11 @@
             }
 
             const scoreInt = (matchMode === 'exact' && Number.isFinite(initialSong.score_int)) ? initialSong.score_int : 0;
-            // Accept zero scores (0点) — only skip if negative or truly missing
-            if (matchMode === 'exact' && scoreInt < 0) {
+            // Main.js behavior: Paid mode (exact) skips if score is 0 or less
+            if (matchMode === 'exact' && scoreInt <= 0) {
                 skippedNoScore++;
                 if (skippedSamples.length < 10) skippedSamples.push({ title: songData.title, diff: songData.diff, reason: 'no-score' });
-                continue; // paid mode: skip if no score
+                continue;
             }
 
             const params = matchMode === 'exact'
@@ -405,7 +409,6 @@
                 score_str: (matchMode === 'exact' && initialSong.score_str) ? initialSong.score_str : '',
                 playCount: 'N/A',
                 params: params,
-                detailSendUrl: initialSong.detailSendUrl || '',
                 jacketUrl: songData.img ? `https://new.chunithm-net.com/chuni-mobile/html/mobile/img/${songData.img}.jpg` : '',
             };
 
@@ -413,24 +416,25 @@
                 songObject.rating = calculateRating(scoreInt, songObject.const);
             }
 
-            enriched.push(songObject);
-            matchedCount++;
+            if (isNewSong) {
+                rawNewSongs.push(songObject);
+            } else {
+                rawOldSongs.push(songObject);
+            }
         }
 
-        console.info('[Ratnator] Enrich stats', { label, totalConst, matchedCount, skippedByThreshold, skippedNoMatch, skippedNoScore });
-        if (skippedByThreshold > 0 || skippedNoMatch > 0 || skippedNoScore > 0) {
-            console.info('[Ratnator] Skipped samples:', skippedSamples);
-        }
+        const uniqueFilter = (song, index, self) => index === self.findIndex(s => s.title === song.title && s.difficulty === song.difficulty);
+        const filteredNewSongs = rawNewSongs.filter(uniqueFilter);
+        const filteredOldSongs = rawOldSongs.filter(uniqueFilter);
 
-        // dedupe by title + difficulty
-        const unique = enriched.filter((s, i, arr) => i === arr.findIndex(x => x.title === s.title && x.difficulty === s.difficulty));
+        console.info('[Ratnator][Diagnostics] Enrich stats', { label, totalConst, newCount: filteredNewSongs.length, oldCount: filteredOldSongs.length, skippedByThreshold, skippedNoMatch, skippedNoScore });
+        if (skippedSamples.length) console.info('[Ratnator][Diagnostics] Skipped samples (up to 10):', skippedSamples);
 
-        // enrichment summary
-        // (no debug logs in production)
+        try { if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(20, `Enriched ${label}: ${filteredOldSongs.length + filteredNewSongs.length}曲`); } catch (e) { }
 
-        try { if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(20, `Enriched ${label}: ${unique.length}曲`); } catch (e) { }
-
-        return unique;
+        if (String(label).toUpperCase() === 'NEW') return filteredNewSongs;
+        if (String(label).toUpperCase() === 'BEST') return filteredOldSongs;
+        return filteredOldSongs.concat(filteredNewSongs);
     };
 
     const fetchRatingDetailSongSeeds = async (pageUrl, label = '') => {
@@ -458,6 +462,11 @@
         });
 
         console.info('[Ratnator] seed', { label, count: initialSongList.length });
+
+        try {
+            const samples = initialSongList.slice(0, 20).map(s => ({ title: s.title, idx: s.params?.idx, diff: s.params?.diff, score_int: s.score_int }));
+            console.info('[Ratnator][Diagnostics] seed samples', { label, samples });
+        } catch (e) { }
 
         try {
             if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(5, `Seeds ${label}: ${initialSongList.length}曲`);
@@ -616,10 +625,12 @@
 
             const constData = await fetch(CONST_DATA_URL).then(response => response.json());
             overlayRefs.statusEl.innerHTML += '<br>定数データを取得しました';
+            try { console.info('[Ratnator][Diagnostics] constData length', { count: Array.isArray(constData) ? constData.length : 0 }); } catch (e) { }
 
             // Simplified flow: only retrieve seeds (BEST/NEW), enrich with const data, and render lists
             const bestSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_BEST, 'BEST seed page');
             const recentSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_RECENT, 'NEW seed page');
+            try { console.info('[Ratnator][Diagnostics] seeds', { best: bestSeeds.length, recent: recentSeeds.length }); } catch (e) { }
 
             const enrichedOldSongs = enrichSongsWithConstData(constData, bestSeeds, 'BEST');
             const enrichedNewSongs = enrichSongsWithConstData(constData, recentSeeds, 'NEW');
