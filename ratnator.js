@@ -464,6 +464,26 @@
                     continue;
                 }
 
+                // detailed debug logging: raw texts and params
+                if (debug) {
+                    debug.log('detailFetch', {
+                        title: song.title,
+                        params: song.params,
+                        seedScoreInt,
+                        detailScoreInt,
+                        rawScoreText: detailStats.rawScoreText,
+                        rawScoreHtml: detailStats.rawScoreHtml,
+                    });
+                } else {
+                    // always log large deltas to console for visibility
+                    const delta = Math.abs((detailScoreInt || 0) - (seedScoreInt || 0));
+                    if (delta >= 10000) {
+                        console.warn('[Ratnator] Large score delta', { title: song.title, seedScoreInt, detailScoreInt, delta, params: song.params });
+                        console.log(' rawScoreText:', detailStats.rawScoreText);
+                        console.log(' rawScoreHtml:', detailStats.rawScoreHtml);
+                    }
+                }
+
                 successCount++;
                 detailedSongs.push({
                     ...song,
