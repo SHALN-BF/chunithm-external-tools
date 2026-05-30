@@ -40,7 +40,7 @@ javascript:(function(){
 ```js
 javascript:(function(){
     const script = document.createElement('script');
-    script.src = "https://raw.githubusercontent.com/taka-4602/chunithm-best-generator/main/ratnator.js?" + new Date().getTime();
+    script.src = "https://shaln-bf.github.io/chunithm-external-tools/ratnator.js?" + new Date().getTime();
     document.body.appendChild(script);
 })();
 ```
