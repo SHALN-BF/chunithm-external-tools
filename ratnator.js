@@ -466,127 +466,9 @@
         return initialSongList;
     };
 
-    const processSongList = async (list, delay, label = '') => {
-        const detailedSongs = [];
-        let successCount = 0;
-        let failCount = 0;
+    // processSongList removed in simplified build
 
-        for (let i = 0; i < list.length; i++) {
-            const song = list[i];
-            if (i > 0 && delay > 0) {
-                await sleep(delay * 1000);
-            }
-
-            try {
-                const detailSendUrl = song.detailSendUrl || URL_RANKING_DETAIL_SEND;
-                const detailDoc = await fetchDocument(detailSendUrl, {
-                    method: 'POST',
-                    body: new URLSearchParams(song.params),
-                    redirect: 'follow',
-                });
-
-                const detailStats = extractMusicDetailStats(detailDoc);
-                const seedScoreInt = Number(song.score_int) || 0;
-                let detailScoreInt = Number(detailStats.scoreInt) || 0;
-
-                // try direct selector extraction from detailDoc to be extra safe
-                try {
-                    const scoreSelectors = ['.musiclist_box .play_musicdata_highscore .text_b', '.box05 .play_musicdata_highscore .text_b', '.play_musicdata_highscore .text_b', '.musicdata_score_num .text_b', '.rank_playdata_highscore .text_b'];
-                    const directText = getTextFromSelectors(detailDoc, scoreSelectors);
-                    const directParsed = parseScoreFromText(directText);
-                    if (directParsed.scoreInt > 0) {
-                        detailScoreInt = directParsed.scoreInt;
-                    }
-                } catch (e) { /* ignore */ }
-
-                // Enforce exact equality: if detail differs from seed, prefer seed (no delta allowed)
-                if (seedScoreInt > 0 && detailScoreInt !== seedScoreInt) {
-                    console.warn('[Ratnator] Detail score differs from seed — forcing seed value', { title: song.title, seed: seedScoreInt, detail: detailScoreInt });
-                    detailScoreInt = seedScoreInt;
-                }
-
-                const scoreInt = detailScoreInt > 0 ? detailScoreInt : seedScoreInt;
-                const scoreStr = detailStats.scoreStr || song.score_str || '';
-                if (!Number.isFinite(scoreInt) || scoreInt <= 0) {
-                    // invalid score, skip
-                    continue;
-                }
-
-                // Log large deltas for visibility
-                const delta = Math.abs((detailScoreInt || 0) - (seedScoreInt || 0));
-                if (delta >= 10000) {
-                    console.warn('[Ratnator] Large score delta', { title: song.title, seedScoreInt, detailScoreInt, delta, params: song.params });
-                    console.log(' rawScoreText:', detailStats.rawScoreText);
-                    console.log(' rawScoreHtml:', detailStats.rawScoreHtml);
-                }
-
-                successCount++;
-                detailedSongs.push({
-                    ...song,
-                    seed_score_int: seedScoreInt,
-                    detail_score_int: detailScoreInt,
-                    score_str: scoreStr,
-                    score_int: scoreInt,
-                    playCount: detailStats.playCount || song.playCount || 'N/A',
-                });
-                // no-op: production build does not emit per-song debug logs
-                try {
-                    if (window.__ratnatorUpdateProgress) {
-                        const p = Math.round(((i + 1) / Math.max(1, list.length)) * 100);
-                        window.__ratnatorUpdateProgress(p, `${label}: ${i + 1}/${list.length}`);
-                    }
-                } catch (e) { }
-            } catch (error) {
-                failCount++;
-                console.warn(`スコア取得失敗: ${song.title}`, error);
-                if (Number(song.score_int) > 0) {
-                    detailedSongs.push({
-                        ...song,
-                        seed_score_int: Number(song.score_int) || 0,
-                        detail_score_int: null,
-                        score_str: song.score_str || String(song.score_int),
-                        score_int: Number(song.score_int),
-                        playCount: song.playCount || 'N/A',
-                    });
-                    // detail fetch failed, used seed (no per-song debug in production)
-                    try {
-                        if (window.__ratnatorUpdateProgress) {
-                            const p = Math.round(((i + 1) / Math.max(1, list.length)) * 100);
-                            window.__ratnatorUpdateProgress(p, `${label}: ${i + 1}/${list.length}`);
-                        }
-                    } catch (e) { }
-                }
-            }
-        }
-
-        console.info('[Ratnator] detail', { label, inputCount: list.length, outputCount: detailedSongs.length, successCount, failCount });
-        try { if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(60, `${label} 完了`); } catch (e) { }
-
-        return detailedSongs;
-    };
-
-    const fetchAllSongsForPaidUserViaRecord = async (delay, constData, options = {}) => {
-        const bestSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_BEST, 'BEST seed page');
-        const recentSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_RECENT, 'NEW seed page');
-
-        const enrichedOldSongs = enrichSongsWithConstData(constData, bestSeeds, 'BEST');
-        const enrichedNewSongs = enrichSongsWithConstData(constData, recentSeeds, 'NEW');
-
-        const detailedOldSongs = await processSongList(enrichedOldSongs, delay, 'BEST detail');
-        const detailedNewSongs = await processSongList(enrichedNewSongs, delay, 'NEW detail');
-
-        detailedNewSongs.forEach(song => {
-            song.rating = calculateRating(song.score_int, song.const);
-        });
-        detailedOldSongs.forEach(song => {
-            song.rating = calculateRating(song.score_int, song.const);
-        });
-
-        detailedNewSongs.sort((a, b) => b.rating - a.rating);
-        detailedOldSongs.sort((a, b) => b.rating - a.rating);
-
-        return { detailedNewSongs, detailedOldSongs };
-    };
+    // fetchAllSongsForPaidUserViaRecord removed in simplified build
 
     const buildFrameLists = (detailedOldSongs, detailedNewSongs) => ({
         best: detailedOldSongs.slice(0, MAX_BEST_COUNT),
@@ -595,145 +477,38 @@
 
     const createOverlay = () => {
         const overlay = document.createElement('div');
-        overlay.style.cssText = [
-            'position: fixed',
-            'inset: 0',
-            'z-index: 999999',
-            'background: rgba(6, 10, 18, 0.88)',
-            'backdrop-filter: blur(10px)',
-            'display: flex',
-            'align-items: center',
-            'justify-content: center',
-            'padding: 20px',
-            'box-sizing: border-box',
-            'color: #f6f9ff',
-            'font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        ].join('; ');
+        overlay.style.cssText = 'position:fixed; inset:0; z-index:999999; background:rgba(6,10,18,0.88); display:flex; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; color:#f6f9ff;';
 
         const panel = document.createElement('div');
-        panel.style.cssText = [
-            'width: min(1180px, 100%)',
-            'max-height: 94vh',
-            'overflow: hidden',
-            'display: grid',
-            'grid-template-rows: auto auto 1fr',
-            'gap: 16px',
-            'padding: 24px',
-            'border-radius: 24px',
-            'border: 1px solid rgba(255,255,255,0.10)',
-            'background: linear-gradient(180deg, rgba(18,25,38,0.98), rgba(10,15,24,0.96))',
-            'box-shadow: 0 28px 80px rgba(0,0,0,0.45)',
-        ].join('; ');
+        panel.style.cssText = 'width:min(980px,100%); max-height:90vh; overflow:auto; padding:20px; border-radius:12px; background:rgba(12,17,26,0.95); border:1px solid rgba(255,255,255,0.06);';
 
         const header = document.createElement('div');
-        header.innerHTML = `
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;">
-                <div>
-                    <div style="font-size:13px; letter-spacing:0.18em; text-transform:uppercase; color:#8cb4ff; margin-bottom:8px;">Ratnator.js</div>
-                    <h1 style="margin:0; font-size:28px; line-height:1.1;">CHUNITHM レート・対象曲テキスト出力</h1>
-                    <p style="margin:10px 0 0; color:#a7b4c7; line-height:1.7;">現在レーティング、Best/New の平均、OverPower、そして各枠のレーティング対象曲を文字情報でまとめます。</p>
-                </div>
-                <div id="ratnator-status" style="min-width:240px; text-align:right; color:#d8e5f7; font-weight:600; line-height:1.6;"></div>
-            </div>
-        `;
-
-        const progressWrap = document.createElement('div');
-        progressWrap.style.cssText = 'width:100%; margin-top:12px;';
-        const progressContainer = document.createElement('div');
-        progressContainer.style.cssText = 'width:100%; height:10px; background:rgba(255,255,255,0.06); border-radius:999px; overflow:hidden;';
-        const progressBar = document.createElement('div');
-        progressBar.style.cssText = 'width:0%; height:100%; background:linear-gradient(90deg,#7bb8ff,#8df0c9); transition:width 200ms linear;';
-        const progressText = document.createElement('div');
-        progressText.style.cssText = 'font-size:12px; color:#cfe8ff; margin-top:6px; text-align:right;';
-        progressContainer.appendChild(progressBar);
-        progressWrap.appendChild(progressContainer);
-        progressWrap.appendChild(progressText);
-        header.appendChild(progressWrap);
-
-        const actions = document.createElement('div');
-        actions.style.cssText = 'display:flex; gap:12px; flex-wrap:wrap; align-items:center;';
-
-        const copyButton = document.createElement('button');
-        copyButton.textContent = '結果をコピー';
-        copyButton.style.cssText = [
-            'appearance:none',
-            'border:0',
-            'cursor:pointer',
-            'border-radius:999px',
-            'padding:12px 18px',
-            'font-weight:700',
-            'color:#08111d',
-            'background: linear-gradient(135deg, #8df0c9, #7bb8ff)',
-            'box-shadow: 0 14px 32px rgba(123,184,255,0.22)',
-        ].join('; ');
+        header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;';
+        header.innerHTML = `<div><div style="font-size:13px;color:#8cb4ff;font-weight:700;">Ratnator</div><div style="font-size:18px;color:#e7f1ff;font-weight:700;">Best / New 一覧</div></div><div id="ratnator-status" style="color:#cfe8ff; text-align:right; min-width:160px;"></div>`;
 
         const closeButton = document.createElement('button');
         closeButton.textContent = '閉じる';
-        closeButton.style.cssText = [
-            'appearance:none',
-            'border:1px solid rgba(255,255,255,0.12)',
-            'background: rgba(255,255,255,0.04)',
-            'cursor:pointer',
-            'border-radius:999px',
-            'padding:12px 18px',
-            'font-weight:700',
-            'color:#f6f9ff',
-        ].join('; ');
+        closeButton.style.cssText = 'appearance:none; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03); color:#f6f9ff; padding:8px 12px; border-radius:999px; cursor:pointer;';
 
-        const body = document.createElement('div');
-        body.style.cssText = [
-            'overflow:auto',
-            'border-radius:20px',
-            'border:1px solid rgba(255,255,255,0.08)',
-            'background: rgba(255,255,255,0.03)',
-            'padding:18px',
-            'white-space:pre-wrap',
-            'word-break:break-word',
-            'font-family: "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, monospace',
-            'font-size:14px',
-            'line-height:1.75',
-            'color:#e7f1ff',
-        ].join('; ');
+        const body = document.createElement('pre');
+        body.style.cssText = 'white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; color:#e7f1ff;';
 
-        actions.appendChild(copyButton);
-        const excelButton = document.createElement('button');
-        excelButton.textContent = 'Excel用コピー';
-        excelButton.style.cssText = [
-            'appearance:none',
-            'border:0',
-            'cursor:pointer',
-            'border-radius:999px',
-            'padding:12px 18px',
-            'font-weight:700',
-            'color:#08111d',
-            'background: linear-gradient(135deg, #ffd27a, #ffc07a)',
-            'box-shadow: 0 10px 24px rgba(255,192,122,0.12)',
-        ].join('; ');
-        actions.appendChild(excelButton);
-        actions.appendChild(closeButton);
+        header.appendChild(closeButton);
         panel.appendChild(header);
-        panel.appendChild(actions);
         panel.appendChild(body);
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
 
-        // expose a progress updater
-        window.__ratnatorUpdateProgress = (percent, text) => {
-            try {
-                const p = Math.max(0, Math.min(100, Number(percent) || 0));
-                progressBar.style.width = p + '%';
-                progressText.textContent = text || '';
-            } catch (e) { /* silent */ }
-        };
+        closeButton.addEventListener('click', () => {
+            overlay.remove();
+            window.__ratnatorRunning = false;
+        });
 
         return {
             overlay,
             statusEl: header.querySelector('#ratnator-status'),
             body,
-            copyButton,
-            excelButton,
             closeButton,
-            progress: window.__ratnatorUpdateProgress,
         };
     };
 
@@ -805,167 +580,11 @@
         return lines.join('\n');
     };
 
-    const renderHtmlReport = (player, bestList, newList) => {
-        const bestRows = bestList.map((song, idx) => {
-            const rankInfo = getRankInfo(song.score_int);
-            const playCountText = song.playCount && song.playCount !== 'N/A' ? song.playCount : 'N/A';
-            const ratingText = Number.isFinite(song.rating) ? song.rating.toFixed(2) : '0.00';
-            const constText = Number.isFinite(song.const) ? song.const.toFixed(2) : 'N/A';
-            const seedScore = Number.isFinite(song.seed_score_int) ? song.seed_score_int : null;
-            const detailScore = Number.isFinite(song.detail_score_int) ? song.detail_score_int : (Number.isFinite(song.score_int) ? song.score_int : null);
-            const usedScoreText = song.score_str || (song.score_int ? String(song.score_int) : '');
-            const delta = (seedScore !== null && detailScore !== null) ? (detailScore - seedScore) : 0;
-            const mismatch = delta !== 0;
-            const rowStyle = mismatch ? 'background: rgba(255,100,100,0.04);' : '';
-            const scoreHtml = `${escapeHtml(usedScoreText)}<br/><small style="color:#9fb7d9;">${escapeHtml(rankInfo.rank)}</small>${mismatch ? `<div style="font-size:11px;color:#ffd7d7;">seed:${seedScore ?? '-'} → detail:${detailScore ?? '-'} (Δ${delta})</div>` : ''}`;
+    // renderHtmlReport removed in simplified build
 
-            return `
-                <tr style="${rowStyle}">
-                    <td style="padding:6px 8px; text-align:right;">${idx + 1}</td>
-                    <td style="padding:6px 8px;">${escapeHtml(song.title)}</td>
-                    <td style="padding:6px 8px; text-align:center;">${escapeHtml(song.difficulty || '')}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(playCountText)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(constText)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(ratingText)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${scoreHtml}</td>
-                </tr>`;
-        }).join('');
+    // escapeHtml removed in simplified build
 
-        const newRows = newList.map((song, idx) => {
-            const rankInfo = getRankInfo(song.score_int);
-            const playCountText = song.playCount && song.playCount !== 'N/A' ? song.playCount : 'N/A';
-            const ratingText = Number.isFinite(song.rating) ? song.rating.toFixed(2) : '0.00';
-            const constText = Number.isFinite(song.const) ? song.const.toFixed(2) : 'N/A';
-            const seedScore = Number.isFinite(song.seed_score_int) ? song.seed_score_int : null;
-            const detailScore = Number.isFinite(song.detail_score_int) ? song.detail_score_int : (Number.isFinite(song.score_int) ? song.score_int : null);
-            const usedScoreText = song.score_str || (song.score_int ? String(song.score_int) : '');
-            const delta = (seedScore !== null && detailScore !== null) ? (detailScore - seedScore) : 0;
-            const mismatch = delta !== 0;
-            const rowStyle = mismatch ? 'background: rgba(255,100,100,0.04);' : '';
-            const scoreHtml = `${escapeHtml(usedScoreText)}<br/><small style="color:#9fb7d9;">${escapeHtml(rankInfo.rank)}</small>${mismatch ? `<div style="font-size:11px;color:#ffd7d7;">seed:${seedScore ?? '-'} → detail:${detailScore ?? '-'} (Δ${delta})</div>` : ''}`;
-
-            return `
-                <tr style="${rowStyle}">
-                    <td style="padding:6px 8px; text-align:right;">${idx + 1}</td>
-                    <td style="padding:6px 8px;">${escapeHtml(song.title)}</td>
-                    <td style="padding:6px 8px; text-align:center;">${escapeHtml(song.difficulty || '')}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(playCountText)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(constText)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(ratingText)}</td>
-                    <td style="padding:6px 8px; text-align:right;">${scoreHtml}</td>
-                </tr>`;
-        }).join('');
-
-        const headerHtml = `
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
-                <div>
-                    <div style="font-weight:700; color:#8cb4ff; margin-bottom:6px;">ユーザー</div>
-                    <div style="font-size:16px; font-weight:700; color:#e7f1ff;">${escapeHtml(player.name)}</div>
-                    <div style="font-size:13px; color:#9fb7d9;">現在レーティング: <span style="color:#7bb8ff;">${Number(player.rating).toFixed(2)}</span></div>
-                </div>
-                <div style="text-align:right; color:#cfe8ff;">
-                    <div>Best Ave: <strong>${calculateAverageRating(bestList).toFixed(4)}</strong></div>
-                    <div>New Ave: <strong>${calculateAverageRating(newList).toFixed(4)}</strong></div>
-                    <div>OverPower: <strong>${escapeHtml(player.overPower || '取得できませんでした')}</strong></div>
-                </div>
-            </div>
-        `;
-
-        const tableStyle = 'width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;';
-        const thStyle = 'text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,0.06); color:#cfe8ff;';
-
-        const html = `
-            ${headerHtml}
-            <div style="margin-top:14px;">
-                <div style="font-weight:700; color:#8df0c9; margin-bottom:6px;">BEST 枠 (${bestList.length}件)</div>
-                <table style="${tableStyle}">
-                    <thead>
-                        <tr>
-                            <th style="${thStyle}; width:48px;">No.</th>
-                            <th style="${thStyle};">タイトル</th>
-                            <th style="${thStyle}; width:90px;">譜面</th>
-                            <th style="${thStyle}; width:90px;">プレイ回数</th>
-                            <th style="${thStyle}; width:90px;">定数</th>
-                            <th style="${thStyle}; width:90px;">単曲レート</th>
-                            <th style="${thStyle}; width:120px; text-align:right;">スコア / ランク</th>
-                        </tr>
-                    </thead>
-                    <tbody style="color:#e7f1ff;">${bestRows}</tbody>
-                </table>
-            </div>
-            <div style="margin-top:16px;">
-                <div style="font-weight:700; color:#7bb8ff; margin-bottom:6px;">NEW 枠 (${newList.length}件)</div>
-                <table style="${tableStyle}">
-                    <thead>
-                        <tr>
-                            <th style="${thStyle}; width:48px;">No.</th>
-                            <th style="${thStyle};">タイトル</th>
-                            <th style="${thStyle}; width:90px;">譜面</th>
-                            <th style="${thStyle}; width:90px;">プレイ回数</th>
-                            <th style="${thStyle}; width:90px;">定数</th>
-                            <th style="${thStyle}; width:90px;">単曲レート</th>
-                            <th style="${thStyle}; width:120px; text-align:right;">スコア / ランク</th>
-                        </tr>
-                    </thead>
-                    <tbody style="color:#e7f1ff;">${newRows}</tbody>
-                </table>
-            </div>
-        `;
-
-        // Diff table removed per user request — return primary HTML only
-        return html;
-    };
-
-    const escapeHtml = (str) => {
-        if (str === null || str === undefined) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    };
-
-    const generateExcelTSV = (player, bestList, newList) => {
-        const sep = '\t';
-        const lines = [];
-        lines.push(`ユーザー\t${player.name}`);
-        lines.push(`現在レーティング\t${Number(player.rating).toFixed(2)}`);
-        lines.push('');
-
-        const header = ['No.', 'タイトル', '譜面', 'プレイ回数', '定数', '単曲レート', 'スコア', 'ランク'].join(sep);
-        lines.push('BEST');
-        lines.push(header);
-        bestList.forEach((song, idx) => {
-            const rank = getRankInfo(song.score_int).rank;
-            const row = [
-                String(idx + 1),
-                String((song.title || '').replace(/\t|\n|\r/g, ' ')),
-                String(song.difficulty || ''),
-                String(song.playCount || ''),
-                String(Number.isFinite(song.const) ? song.const.toFixed(2) : ''),
-                String(Number.isFinite(song.rating) ? song.rating.toFixed(2) : ''),
-                String(song.score_str || song.score_int || ''),
-                String(rank),
-            ].join(sep);
-            lines.push(row);
-        });
-
-        lines.push('');
-        lines.push('NEW');
-        lines.push(header);
-        newList.forEach((song, idx) => {
-            const rank = getRankInfo(song.score_int).rank;
-            const row = [
-                String(idx + 1),
-                String((song.title || '').replace(/\t|\n|\r/g, ' ')),
-                String(song.difficulty || ''),
-                String(song.playCount || ''),
-                String(Number.isFinite(song.const) ? song.const.toFixed(2) : ''),
-                String(Number.isFinite(song.rating) ? song.rating.toFixed(2) : ''),
-                String(song.score_str || song.score_int || ''),
-                String(rank),
-            ].join(sep);
-            lines.push(row);
-        });
-
-        return lines.join('\n');
-    };
+    // generateExcelTSV removed in simplified build
 
     const showError = (overlayRefs, message) => {
         overlayRefs.statusEl.innerHTML = `<span style="color:#ffb3b3;">エラー</span>`;
@@ -998,57 +617,23 @@
             const constData = await fetch(CONST_DATA_URL).then(response => response.json());
             overlayRefs.statusEl.innerHTML += '<br>定数データを取得しました';
 
-            const paidResult = await fetchAllSongsForPaidUserViaRecord(SONG_DETAIL_DELAY_SEC, constData);
-            const detailedOldSongs = paidResult.detailedOldSongs;
-            const detailedNewSongs = paidResult.detailedNewSongs;
+            // Simplified flow: only retrieve seeds (BEST/NEW), enrich with const data, and render lists
+            const bestSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_BEST, 'BEST seed page');
+            const recentSeeds = await fetchRatingDetailSongSeeds(URL_RATING_DETAIL_RECENT, 'NEW seed page');
 
-            // final counts logged
+            const enrichedOldSongs = enrichSongsWithConstData(constData, bestSeeds, 'BEST');
+            const enrichedNewSongs = enrichSongsWithConstData(constData, recentSeeds, 'NEW');
 
-            const frameLists = buildFrameLists(detailedOldSongs, detailedNewSongs);
+            const frameLists = buildFrameLists(enrichedOldSongs, enrichedNewSongs);
             const bestList = frameLists.best;
             const newList = frameLists.recent;
+
             reportText = renderTextReport(player, bestList, newList);
-            overlayRefs.body.innerHTML = renderHtmlReport(player, bestList, newList);
-            overlayRefs.statusEl.innerHTML = `
-                ユーザー: <span style="color:#8df0c9;">${player.name}</span><br>
-                現在レーティング: <span style="color:#7bb8ff;">${Number(player.rating).toFixed(2)}</span><br>
-                Best Ave / New Ave も含むテキスト出力を生成しました
-            `;
-
-            overlayRefs.copyButton.addEventListener('click', async () => {
-                try {
-                    await navigator.clipboard.writeText(reportText);
-                    overlayRefs.copyButton.textContent = 'コピー完了';
-                    setTimeout(() => {
-                        overlayRefs.copyButton.textContent = '結果をコピー';
-                    }, 1500);
-                } catch (error) {
-                    overlayRefs.copyButton.textContent = 'コピー失敗';
-                    setTimeout(() => {
-                        overlayRefs.copyButton.textContent = '結果をコピー';
-                    }, 1500);
-                }
-            });
-
-            overlayRefs.excelButton.addEventListener('click', async () => {
-                try {
-                    const tsv = generateExcelTSV(player, bestList, newList);
-                    await navigator.clipboard.writeText(tsv);
-                    overlayRefs.excelButton.textContent = 'コピー完了';
-                    setTimeout(() => {
-                        overlayRefs.excelButton.textContent = 'Excel用コピー';
-                    }, 1500);
-                } catch (error) {
-                    overlayRefs.excelButton.textContent = 'コピー失敗';
-                    setTimeout(() => {
-                        overlayRefs.excelButton.textContent = 'Excel用コピー';
-                    }, 1500);
-                }
-            });
+            overlayRefs.body.textContent = reportText;
+            overlayRefs.statusEl.innerHTML = `ユーザー: <span style="color:#8df0c9;">${player.name}</span>`;
         } catch (error) {
             console.error(error);
             showError(overlayRefs, error.message || String(error));
-            overlayRefs.copyButton.disabled = true;
         }
     };
 
