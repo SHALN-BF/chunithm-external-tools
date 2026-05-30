@@ -345,9 +345,9 @@
         const playCountSelectors = [
             '.musiclist_box .playcount .text_b',
             '.musiclist_box .musicdata_playcount .text_b',
-            '.block_underline .musicdata_score_num .text_b',
+            '.block_underline .musicdata_playcount .text_b',
             '.musicdata_playcount .text_b',
-            '.play_count .text_b'
+            '.play_count .text_b',
         ];
         const playCountTextCandidate = getTextFromSelectors(root, playCountSelectors) || extractTextByLabel(root, [/プレイ回数/i, /プレイ数/i, /PLAY\s*COUNT/i, /PLAYCOUNT/i]);
 
