@@ -299,7 +299,16 @@
                 const candidates = titleMap.get(normalizedTitle) || [];
                 songData = candidates.find(entry => entry.diff === diffKey) || candidates[0] || null;
             }
-            if (!songData) return null;
+            if (!songData) {
+                if (debug) debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, matched: null, candidates: (titleMap.get(normalizedTitle) || []).length, params: song.params });
+                return null;
+            }
+
+            if (debug) {
+                const matched = { title: songData.title, diff: songData.diff, const: songData.const, img: songData.img };
+                const candidates = (titleMap.get(normalizedTitle) || []).map(c => ({ title: c.title, diff: c.diff, const: c.const }));
+                debug.log('enrichMatch', { label, originalTitle: song.title, normalizedTitle, diffCode, diffKey, matched, candidatesCount: candidates.length, params: song.params });
+            }
 
             return {
                 title: songData.title,
