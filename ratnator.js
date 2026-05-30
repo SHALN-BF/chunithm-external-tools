@@ -324,6 +324,8 @@
                 sampleOutput: enriched.slice(0, 3).map(song => ({ title: song.title, difficulty: song.difficulty, const: song.const })),
             });
         }
+
+        return enriched;
     };
 
     const fetchRatingDetailSongSeeds = async (pageUrl, debug = null, label = '') => {
