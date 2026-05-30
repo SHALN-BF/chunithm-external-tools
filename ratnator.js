@@ -75,7 +75,8 @@
             return { scoreStr: '', scoreInt: 0 };
         }
         const normalized = String(text).replace(/\s+/g, '');
-        const match = normalized.match(/\d[\d,]*/);
+        // require at least 6 digits (score-like) to avoid picking up small numbers
+        const match = normalized.match(/\d[\d,]{5,}/);
         if (!match) {
             return { scoreStr: '', scoreInt: 0 };
         }
@@ -147,6 +148,22 @@
         return total / list.length;
     };
 
+    const getTextFromSelectors = (root, selectors) => {
+        const list = Array.isArray(selectors) ? selectors : [selectors];
+        for (const sel of list) {
+            try {
+                const el = root.querySelector(sel);
+                if (el) {
+                    const t = (el.innerText || el.textContent || '').trim();
+                    if (t) return t;
+                }
+            } catch (e) {
+                // invalid selector - ignore
+            }
+        }
+        return '';
+    };
+
     const extractTextByLabel = (root, labelPatterns) => {
         const patterns = Array.isArray(labelPatterns) ? labelPatterns : [labelPatterns];
         const nodes = root.querySelectorAll('*');
@@ -155,7 +172,7 @@
             if (!text) continue;
             if (!patterns.some(pattern => pattern.test(text))) continue;
 
-            const numbers = text.match(/\d[\d,]*(?:\.\d+)?/g);
+            const numbers = text.match(/\d[\d,]{5,}(?:\.\d+)?/g) || text.match(/\d[\d,]*(?:\.\d+)?/g);
             if (numbers && numbers.length) {
                 return numbers[numbers.length - 1];
             }
@@ -163,8 +180,8 @@
             const neighbors = [node.nextElementSibling, node.parentElement?.nextElementSibling];
             for (const neighbor of neighbors) {
                 if (!neighbor) continue;
-                const neighborText = (neighbor.textContent || '').replace(/\s+/g, ' ').trim();
-                const neighborNumbers = neighborText.match(/\d[\d,]*(?:\.\d+)?/g);
+                const neighborText = (neighbor.textContent || neighbor.innerText || '').replace(/\s+/g, ' ').trim();
+                const neighborNumbers = neighborText.match(/\d[\d,]{5,}(?:\.\d+)?/g) || neighborText.match(/\d[\d,]*(?:\.\d+)?/g);
                 if (neighborNumbers && neighborNumbers.length) {
                     return neighborNumbers[neighborNumbers.length - 1];
                 }
@@ -174,31 +191,37 @@
     };
 
     const extractMusicDetailStats = (root) => {
-        const scoreElement = root.querySelector('.musicdata_score_num .text_b, .rank_playdata_highscore .text_b, .play_musicdata_highscore .text_b');
-        const scoreElementText = scoreElement?.innerText?.trim();
-        const scoreElementHtml = scoreElement?.outerHTML || '';
-        const scoreText = (scoreElementText && scoreElementText.trim()) || extractTextByLabel(root, [
-            /HIGH\s*SCORE/i,
-            /SCORE/i,
-            /スコア/i,
-        ]);
-        const parsedScore = parseScoreFromText(scoreText);
+        // try selector-first extraction (explicit score elements)
+        const scoreSelectors = [
+            '.musiclist_box .play_musicdata_highscore .text_b',
+            '.box05 .play_musicdata_highscore .text_b',
+            '.play_musicdata_highscore .text_b',
+            '.musicdata_score_num .text_b',
+            '.rank_playdata_highscore .text_b'
+        ];
+        const scoreElementText = getTextFromSelectors(root, scoreSelectors);
+        const scoreElementHtml = (root.querySelector(scoreSelectors[0])?.outerHTML) || '';
 
-        const playCountBlock = Array.from(root.querySelectorAll('.block_underline')).find(block => /プレイ回数/i.test(block.textContent || ''));
-        const playCountElement = playCountBlock?.querySelector('.musicdata_score_num .text_b');
-        const playCountText = playCountElement?.innerText?.trim() || extractTextByLabel(root, [
-            /プレイ回数/i,
-            /プレイ数/i,
-            /PLAY\s*COUNT/i,
-            /PLAYCOUNT/i,
-        ]);
+        // fallback to label-based extraction if selector didn't yield a score-like string
+        const scoreTextCandidate = scoreElementText || extractTextByLabel(root, [/HIGH\s*SCORE/i, /SCORE/i, /スコア/i]);
+        const parsedScore = parseScoreFromText(scoreTextCandidate);
+
+        // play count selector-first
+        const playCountSelectors = [
+            '.musiclist_box .playcount .text_b',
+            '.musiclist_box .musicdata_playcount .text_b',
+            '.block_underline .musicdata_score_num .text_b',
+            '.musicdata_playcount .text_b',
+            '.play_count .text_b'
+        ];
+        const playCountTextCandidate = getTextFromSelectors(root, playCountSelectors) || extractTextByLabel(root, [/プレイ回数/i, /プレイ数/i, /PLAY\s*COUNT/i, /PLAYCOUNT/i]);
 
         return {
             scoreStr: parsedScore.scoreStr,
             scoreInt: parsedScore.scoreInt,
-            rawScoreText: scoreElementText || scoreText || '',
+            rawScoreText: scoreTextCandidate || '',
             rawScoreHtml: scoreElementHtml || '',
-            playCount: playCountText,
+            playCount: playCountTextCandidate || '',
         };
     };
 
