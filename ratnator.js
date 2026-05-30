@@ -325,6 +325,10 @@
             });
         }
 
+        try {
+            if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(20, `Enriched ${label}: ${enriched.length}曲`);
+        } catch (e) { }
+
         return enriched;
     };
 
@@ -359,6 +363,10 @@
                 sample: initialSongList.slice(0, 3).map(song => ({ title: song.title, diff: song.params?.diff, score_int: song.score_int })),
             });
         }
+
+        try {
+            if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(5, `Seeds ${label}: ${initialSongList.length}曲`);
+        } catch (e) { }
 
         return initialSongList;
     };
@@ -395,6 +403,12 @@
                     score_int: scoreInt,
                     playCount: detailStats.playCount || song.playCount || 'N/A',
                 });
+                try {
+                    if (window.__ratnatorUpdateProgress) {
+                        const p = Math.round(((i + 1) / Math.max(1, list.length)) * 100);
+                        window.__ratnatorUpdateProgress(p, `${label}: ${i + 1}/${list.length}`);
+                    }
+                } catch (e) { }
             } catch (error) {
                 failCount++;
                 console.warn(`スコア取得失敗: ${song.title}`, error);
@@ -405,6 +419,12 @@
                         score_int: Number(song.score_int),
                         playCount: song.playCount || 'N/A',
                     });
+                    try {
+                        if (window.__ratnatorUpdateProgress) {
+                            const p = Math.round(((i + 1) / Math.max(1, list.length)) * 100);
+                            window.__ratnatorUpdateProgress(p, `${label}: ${i + 1}/${list.length}`);
+                        }
+                    } catch (e) { }
                 }
             }
         }
@@ -419,6 +439,7 @@
                 sampleOutput: detailedSongs.slice(0, 3).map(song => ({ title: song.title, score_int: song.score_int, const: song.const })),
             });
         }
+        try { if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(60, `${label} 完了`); } catch (e) { }
 
         return detailedSongs;
     };
@@ -496,6 +517,19 @@
             </div>
         `;
 
+        const progressWrap = document.createElement('div');
+        progressWrap.style.cssText = 'width:100%; margin-top:12px;';
+        const progressContainer = document.createElement('div');
+        progressContainer.style.cssText = 'width:100%; height:10px; background:rgba(255,255,255,0.06); border-radius:999px; overflow:hidden;';
+        const progressBar = document.createElement('div');
+        progressBar.style.cssText = 'width:0%; height:100%; background:linear-gradient(90deg,#7bb8ff,#8df0c9); transition:width 200ms linear;';
+        const progressText = document.createElement('div');
+        progressText.style.cssText = 'font-size:12px; color:#cfe8ff; margin-top:6px; text-align:right;';
+        progressContainer.appendChild(progressBar);
+        progressWrap.appendChild(progressContainer);
+        progressWrap.appendChild(progressText);
+        header.appendChild(progressWrap);
+
         const actions = document.createElement('div');
         actions.style.cssText = 'display:flex; gap:12px; flex-wrap:wrap; align-items:center;';
 
@@ -542,6 +576,20 @@
         ].join('; ');
 
         actions.appendChild(copyButton);
+        const excelButton = document.createElement('button');
+        excelButton.textContent = 'Excel用コピー';
+        excelButton.style.cssText = [
+            'appearance:none',
+            'border:0',
+            'cursor:pointer',
+            'border-radius:999px',
+            'padding:12px 18px',
+            'font-weight:700',
+            'color:#08111d',
+            'background: linear-gradient(135deg, #ffd27a, #ffc07a)',
+            'box-shadow: 0 10px 24px rgba(255,192,122,0.12)',
+        ].join('; ');
+        actions.appendChild(excelButton);
         actions.appendChild(closeButton);
         panel.appendChild(header);
         panel.appendChild(actions);
@@ -549,12 +597,23 @@
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
 
+        // expose a progress updater
+        window.__ratnatorUpdateProgress = (percent, text) => {
+            try {
+                const p = Math.max(0, Math.min(100, Number(percent) || 0));
+                progressBar.style.width = p + '%';
+                progressText.textContent = text || '';
+            } catch (e) { /* silent */ }
+        };
+
         return {
             overlay,
             statusEl: header.querySelector('#ratnator-status'),
             body,
             copyButton,
+            excelButton,
             closeButton,
+            progress: window.__ratnatorUpdateProgress,
         };
     };
 
@@ -634,6 +693,158 @@
         return lines.join('\n');
     };
 
+    const renderHtmlReport = (player, bestList, newList, diagnostics = []) => {
+        const bestRows = bestList.map((song, idx) => {
+            const rankInfo = getRankInfo(song.score_int);
+            const scoreText = song.score_str || song.score_int.toLocaleString('en-US');
+            const playCountText = song.playCount && song.playCount !== 'N/A' ? song.playCount : 'N/A';
+            const ratingText = Number.isFinite(song.rating) ? song.rating.toFixed(2) : '0.00';
+            const constText = Number.isFinite(song.const) ? song.const.toFixed(2) : 'N/A';
+            return `
+                <tr>
+                    <td style="padding:6px 8px; text-align:right;">${idx + 1}</td>
+                    <td style="padding:6px 8px;">${escapeHtml(song.title)}</td>
+                    <td style="padding:6px 8px; text-align:center;">${escapeHtml(song.difficulty || '')}</td>
+                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(playCountText)}</td>
+                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(constText)}</td>
+                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(ratingText)}</td>
+                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(scoreText)}<br/><small style="color:#9fb7d9;">${escapeHtml(rankInfo.rank)}</small></td>
+                </tr>`;
+        }).join('');
+
+        const newRows = newList.map((song, idx) => {
+            const rankInfo = getRankInfo(song.score_int);
+            const scoreText = song.score_str || song.score_int.toLocaleString('en-US');
+            const playCountText = song.playCount && song.playCount !== 'N/A' ? song.playCount : 'N/A';
+            const ratingText = Number.isFinite(song.rating) ? song.rating.toFixed(2) : '0.00';
+            const constText = Number.isFinite(song.const) ? song.const.toFixed(2) : 'N/A';
+            return `
+                <tr>
+                    <td style="padding:6px 8px; text-align:right;">${idx + 1}</td>
+                    <td style="padding:6px 8px;">${escapeHtml(song.title)}</td>
+                    <td style="padding:6px 8px; text-align:center;">${escapeHtml(song.difficulty || '')}</td>
+                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(playCountText)}</td>
+                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(constText)}</td>
+                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(ratingText)}</td>
+                    <td style="padding:6px 8px; text-align:right;">${escapeHtml(scoreText)}<br/><small style="color:#9fb7d9;">${escapeHtml(rankInfo.rank)}</small></td>
+                </tr>`;
+        }).join('');
+
+        const headerHtml = `
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                <div>
+                    <div style="font-weight:700; color:#8cb4ff; margin-bottom:6px;">ユーザー</div>
+                    <div style="font-size:16px; font-weight:700; color:#e7f1ff;">${escapeHtml(player.name)}</div>
+                    <div style="font-size:13px; color:#9fb7d9;">現在レーティング: <span style="color:#7bb8ff;">${Number(player.rating).toFixed(2)}</span></div>
+                </div>
+                <div style="text-align:right; color:#cfe8ff;">
+                    <div>Best Ave: <strong>${calculateAverageRating(bestList).toFixed(4)}</strong></div>
+                    <div>New Ave: <strong>${calculateAverageRating(newList).toFixed(4)}</strong></div>
+                    <div>OverPower: <strong>${escapeHtml(player.overPower || '取得できませんでした')}</strong></div>
+                </div>
+            </div>
+        `;
+
+        const tableStyle = 'width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;';
+        const thStyle = 'text-align:left; padding:8px; border-bottom:1px solid rgba(255,255,255,0.06); color:#cfe8ff;';
+
+        const html = `
+            ${headerHtml}
+            <div style="margin-top:14px;">
+                <div style="font-weight:700; color:#8df0c9; margin-bottom:6px;">BEST 枠 (${bestList.length}件)</div>
+                <table style="${tableStyle}">
+                    <thead>
+                        <tr>
+                            <th style="${thStyle}; width:48px;">No.</th>
+                            <th style="${thStyle};">タイトル</th>
+                            <th style="${thStyle}; width:90px;">譜面</th>
+                            <th style="${thStyle}; width:90px;">プレイ回数</th>
+                            <th style="${thStyle}; width:90px;">定数</th>
+                            <th style="${thStyle}; width:90px;">単曲レート</th>
+                            <th style="${thStyle}; width:120px; text-align:right;">スコア / ランク</th>
+                        </tr>
+                    </thead>
+                    <tbody style="color:#e7f1ff;">${bestRows}</tbody>
+                </table>
+            </div>
+            <div style="margin-top:16px;">
+                <div style="font-weight:700; color:#7bb8ff; margin-bottom:6px;">NEW 枠 (${newList.length}件)</div>
+                <table style="${tableStyle}">
+                    <thead>
+                        <tr>
+                            <th style="${thStyle}; width:48px;">No.</th>
+                            <th style="${thStyle};">タイトル</th>
+                            <th style="${thStyle}; width:90px;">譜面</th>
+                            <th style="${thStyle}; width:90px;">プレイ回数</th>
+                            <th style="${thStyle}; width:90px;">定数</th>
+                            <th style="${thStyle}; width:90px;">単曲レート</th>
+                            <th style="${thStyle}; width:120px; text-align:right;">スコア / ランク</th>
+                        </tr>
+                    </thead>
+                    <tbody style="color:#e7f1ff;">${newRows}</tbody>
+                </table>
+            </div>
+        `;
+
+        let debugHtml = '';
+        if (diagnostics && diagnostics.length) {
+            debugHtml = '<div style="margin-top:12px; color:#9fb7d9;"><strong>DEBUG</strong><pre style="white-space:pre-wrap;">' + escapeHtml(JSON.stringify(diagnostics, null, 2)) + '</pre></div>';
+        }
+
+        return html + debugHtml;
+    };
+
+    const escapeHtml = (str) => {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    const generateExcelTSV = (player, bestList, newList) => {
+        const sep = '\t';
+        const lines = [];
+        lines.push(`ユーザー\t${player.name}`);
+        lines.push(`現在レーティング\t${Number(player.rating).toFixed(2)}`);
+        lines.push('');
+
+        const header = ['No.', 'タイトル', '譜面', 'プレイ回数', '定数', '単曲レート', 'スコア', 'ランク'].join(sep);
+        lines.push('BEST');
+        lines.push(header);
+        bestList.forEach((song, idx) => {
+            const rank = getRankInfo(song.score_int).rank;
+            const row = [
+                String(idx + 1),
+                String((song.title || '').replace(/\t|\n|\r/g, ' ')),
+                String(song.difficulty || ''),
+                String(song.playCount || ''),
+                String(Number.isFinite(song.const) ? song.const.toFixed(2) : ''),
+                String(Number.isFinite(song.rating) ? song.rating.toFixed(2) : ''),
+                String(song.score_str || song.score_int || ''),
+                String(rank),
+            ].join(sep);
+            lines.push(row);
+        });
+
+        lines.push('');
+        lines.push('NEW');
+        lines.push(header);
+        newList.forEach((song, idx) => {
+            const rank = getRankInfo(song.score_int).rank;
+            const row = [
+                String(idx + 1),
+                String((song.title || '').replace(/\t|\n|\r/g, ' ')),
+                String(song.difficulty || ''),
+                String(song.playCount || ''),
+                String(Number.isFinite(song.const) ? song.const.toFixed(2) : ''),
+                String(Number.isFinite(song.rating) ? song.rating.toFixed(2) : ''),
+                String(song.score_str || song.score_int || ''),
+                String(rank),
+            ].join(sep);
+            lines.push(row);
+        });
+
+        return lines.join('\n');
+    };
+
     const showError = (overlayRefs, message) => {
         overlayRefs.statusEl.innerHTML = `<span style="color:#ffb3b3;">エラー</span>`;
         overlayRefs.body.textContent = message;
@@ -687,7 +898,7 @@
             const bestList = frameLists.best;
             const newList = frameLists.recent;
             reportText = renderTextReport(player, bestList, newList, diagnostics.entries);
-            overlayRefs.body.textContent = reportText;
+            overlayRefs.body.innerHTML = renderHtmlReport(player, bestList, newList, diagnostics.entries);
             overlayRefs.statusEl.innerHTML = `
                 ユーザー: <span style="color:#8df0c9;">${player.name}</span><br>
                 現在レーティング: <span style="color:#7bb8ff;">${Number(player.rating).toFixed(2)}</span><br>
@@ -705,6 +916,22 @@
                     overlayRefs.copyButton.textContent = 'コピー失敗';
                     setTimeout(() => {
                         overlayRefs.copyButton.textContent = '結果をコピー';
+                    }, 1500);
+                }
+            });
+
+            overlayRefs.excelButton.addEventListener('click', async () => {
+                try {
+                    const tsv = generateExcelTSV(player, bestList, newList);
+                    await navigator.clipboard.writeText(tsv);
+                    overlayRefs.excelButton.textContent = 'コピー完了';
+                    setTimeout(() => {
+                        overlayRefs.excelButton.textContent = 'Excel用コピー';
+                    }, 1500);
+                } catch (error) {
+                    overlayRefs.excelButton.textContent = 'コピー失敗';
+                    setTimeout(() => {
+                        overlayRefs.excelButton.textContent = 'Excel用コピー';
                     }, 1500);
                 }
             });
