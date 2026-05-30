@@ -336,15 +336,26 @@
         }
 
         const enriched = [];
+        let totalConst = 0;
+        let skippedByThreshold = 0;
+        let skippedNoMatch = 0;
+        let skippedNoScore = 0;
+        const skippedSamples = [];
+        let matchedCount = 0;
 
         for (const songData of constData) {
+            totalConst++;
             if (!songData || !diffMap[songData.diff]) continue;
 
             const isNewSong = songData.version === CURRENT_VERSION;
 
             if (applyConstThreshold) {
                 const threshold = isNewSong ? newConstThreshold : bestConstThreshold;
-                if (Number(songData.const) < threshold) continue;
+                if (Number(songData.const) < threshold) {
+                    skippedByThreshold++;
+                    if (skippedSamples.length < 10) skippedSamples.push({ title: songData.title, diff: songData.diff, const: songData.const, version: songData.version });
+                    continue;
+                }
             }
 
             let initialSong = null;
@@ -355,10 +366,18 @@
                 initialSong = songSeedMap.get(normalizeTitle(songData.title));
             }
 
-            if (!initialSong) continue;
+            if (!initialSong) {
+                skippedNoMatch++;
+                if (skippedSamples.length < 10) skippedSamples.push({ title: songData.title, diff: songData.diff, reason: 'no-match' });
+                continue;
+            }
 
             const scoreInt = (matchMode === 'exact' && Number.isFinite(initialSong.score_int)) ? initialSong.score_int : 0;
-            if (matchMode === 'exact' && scoreInt <= 0) continue; // paid mode: skip if no score
+            if (matchMode === 'exact' && scoreInt <= 0) {
+                skippedNoScore++;
+                if (skippedSamples.length < 10) skippedSamples.push({ title: songData.title, diff: songData.diff, reason: 'no-score' });
+                continue; // paid mode: skip if no score
+            }
 
             const params = matchMode === 'exact'
                 ? initialSong.params
@@ -382,6 +401,16 @@
             }
 
             enriched.push(songObject);
+            matchedCount++;
+        }
+
+        if (debug) {
+            debug.log('enrichStats', { label, totalConst, matchedCount, skippedByThreshold, skippedNoMatch, skippedNoScore, skippedSamples });
+        } else {
+            console.info('[Ratnator] Enrich stats', { label, totalConst, matchedCount, skippedByThreshold, skippedNoMatch, skippedNoScore });
+            if (skippedByThreshold > 0 || skippedNoMatch > 0 || skippedNoScore > 0) {
+                console.info('[Ratnator] Skipped samples:', skippedSamples);
+            }
         }
 
         // dedupe by title + difficulty
@@ -456,7 +485,24 @@
 
                 const detailStats = extractMusicDetailStats(detailDoc);
                 const seedScoreInt = Number(song.score_int) || 0;
-                const detailScoreInt = Number(detailStats.scoreInt) || 0;
+                let detailScoreInt = Number(detailStats.scoreInt) || 0;
+
+                // try direct selector extraction from detailDoc to be extra safe
+                try {
+                    const scoreSelectors = ['.musiclist_box .play_musicdata_highscore .text_b', '.box05 .play_musicdata_highscore .text_b', '.play_musicdata_highscore .text_b', '.musicdata_score_num .text_b', '.rank_playdata_highscore .text_b'];
+                    const directText = getTextFromSelectors(detailDoc, scoreSelectors);
+                    const directParsed = parseScoreFromText(directText);
+                    if (directParsed.scoreInt > 0) {
+                        detailScoreInt = directParsed.scoreInt;
+                    }
+                } catch (e) { /* ignore */ }
+
+                // Enforce exact equality: if detail differs from seed, prefer seed (no delta allowed)
+                if (seedScoreInt > 0 && detailScoreInt !== seedScoreInt) {
+                    console.warn('[Ratnator] Detail score differs from seed — forcing seed value', { title: song.title, seed: seedScoreInt, detail: detailScoreInt });
+                    detailScoreInt = seedScoreInt;
+                }
+
                 const scoreInt = detailScoreInt > 0 ? detailScoreInt : seedScoreInt;
                 const scoreStr = detailStats.scoreStr || song.score_str || '';
                 if (!Number.isFinite(scoreInt) || scoreInt <= 0) {
