@@ -22,3 +22,25 @@ javascript:(function(){
     document.body.appendChild(script);
 })();
 ```
+
+## Ratnator.js
+有料版専用のテキスト出力ツールです。
+`ratingDetailBest` / `ratingDetailRecent` から BEST / NEW の対象曲を取得して、以下をまとめて表示します。
+
+* 現在レーティング
+* Best / New それぞれの Ave
+* OverPower
+* BEST / NEW 枠それぞれの対象曲一覧
+    * 曲名と難易度
+    * プレイ回数
+    * 譜面定数
+    * 単曲レート
+    * スコア / ランク
+
+```js
+javascript:(function(){
+    const script = document.createElement('script');
+    script.src = "https://raw.githubusercontent.com/taka-4602/chunithm-best-generator/main/ratnator.js?" + new Date().getTime();
+    document.body.appendChild(script);
+})();
+```
