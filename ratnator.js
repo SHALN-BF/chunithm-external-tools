@@ -562,19 +562,32 @@
 
     const fetchRatingDetailSongSeeds = async (pageUrl, label = '') => {
         const doc = await fetchDocument(pageUrl);
-        const songForms = doc.querySelectorAll('form[action$="sendMusicDetail/"]');
+        // Accept multiple form patterns: sendMusicDetail, sendRankingDetail, or any form that contains idx/diff inputs
+        const allForms = Array.from(doc.querySelectorAll('form'));
+        const songForms = allForms.filter(f => {
+            // prefer explicit actions, but accept forms that contain idx/diff inputs
+            const action = (f.getAttribute('action') || '').toLowerCase();
+            if (action.includes('sendmusicdetail') || action.includes('sendrankingdetail') || action.includes('sendranking')) return true;
+            return !!(f.querySelector('input[name="idx"]') || f.querySelector('input[name="diff"]'));
+        });
+
         const initialSongList = [];
 
         songForms.forEach(form => {
-            const title = form.querySelector('.music_title')?.innerText?.trim();
-            // try to find a nearby container that holds score/playcount (often the .music_box before the form)
+            // title can be inside the form or in nearby containers; try several fallbacks
             const container = form.closest('.music_box') || form.previousElementSibling || form.parentElement || form;
-            const seedStats = extractSeedDetailStats(container);
+            let title = (form.querySelector('.music_title')?.innerText?.trim()) ||
+                (container && container.querySelector('.play_musicdata_title')?.innerText?.trim()) ||
+                (container && container.querySelector('.musicdata_title')?.innerText?.trim()) ||
+                (doc.querySelector('.play_musicdata_title')?.innerText?.trim()) || '';
+
+            const seedStats = extractSeedDetailStats(container || form);
             const params = {};
             form.querySelectorAll('input[name]').forEach(input => {
                 params[input.name] = input.value || '';
             });
-            if (!title || !params.idx || !params.token || !params.genre || !params.diff) return;
+            // require at least idx and token to be considered a seed
+            if (!title || !params.idx || !params.token) return;
 
             initialSongList.push({
                 title,
@@ -592,6 +605,44 @@
             const samples = initialSongList.slice(0, 20).map(s => ({ title: s.title, idx: s.params?.idx, diff: s.params?.diff, score_int: s.score_int }));
             console.info('[Ratnator][Diagnostics] seed samples', { label, samples });
         } catch (e) { }
+
+        // additional: many pages render a global title and per-diff .music_box blocks
+        try {
+            const existingIdxs = new Set(initialSongList.map(s => s.params?.idx));
+            const boxes = Array.from(doc.querySelectorAll('.music_box'));
+            const globalTitle = doc.querySelector('.play_musicdata_title')?.innerText?.trim() || '';
+            boxes.forEach(box => {
+                try {
+                    const form = box.querySelector('form') || box.querySelector('form[action]');
+                    const params = {};
+                    if (form) {
+                        form.querySelectorAll('input[name]').forEach(input => { params[input.name] = input.value || ''; });
+                    }
+                    // if no form, try to find hidden inputs anywhere inside box
+                    if (!form) {
+                        const inputs = box.querySelectorAll('input[type=hidden][name]');
+                        inputs.forEach(input => { params[input.name] = input.value || ''; });
+                    }
+
+                    if (!params.idx || !params.token) return; // require seed identifiers
+                    if (existingIdxs.has(params.idx)) return;
+
+                    const title = globalTitle || box.querySelector('.play_musicdata_title')?.innerText?.trim() || box.querySelector('.musicdata_title')?.innerText?.trim() || '';
+                    if (!title) return;
+
+                    const seedStats = extractSeedDetailStats(box);
+                    initialSongList.push({
+                        title,
+                        detailSendUrl: (form && form.getAttribute('action')) ? new URL(form.getAttribute('action'), window.location.origin).href : '',
+                        params,
+                        score_str: seedStats.score_str,
+                        score_int: seedStats.score_int,
+                        playCount: seedStats.playCount || 'N/A',
+                    });
+                    existingIdxs.add(params.idx);
+                } catch (e) { /* ignore individual box errors */ }
+            });
+        } catch (e) { /* ignore box-scan errors */ }
 
         try {
             if (window.__ratnatorUpdateProgress) window.__ratnatorUpdateProgress(5, `Seeds ${label}: ${initialSongList.length}曲`);
