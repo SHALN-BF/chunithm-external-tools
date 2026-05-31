@@ -192,6 +192,21 @@
         };
     };
 
+    const normalizeDiffRaw = (raw) => {
+        if (!raw) return null;
+        const text = String(raw).trim();
+        const numberMatch = text.match(/([0-4])/);
+        if (numberMatch) return String(numberMatch[1]);
+
+        const lower = text.toLowerCase();
+        if (/\b(basic|bas)\b/.test(lower) || /ベーシック|べーしっく|ベーシク|ベシック/.test(text)) return '0';
+        if (/\b(advanced|adv)\b/.test(lower) || /アドバンス|アドバン|アドバンスド|アドバ|あどばんす/.test(text)) return '1';
+        if (/\b(expert|exp)\b/.test(lower) || /エキスパート|エキスパ/.test(text)) return '2';
+        if (/\b(master|mas)\b/.test(lower) || /マスター|マスタ/.test(text)) return '3';
+        if (/\b(ultima|ult|ultimate)\b/.test(lower) || /ウルティマ|アルティマ|ウルティメイト|アルティメット/.test(text)) return '4';
+        return null;
+    };
+
     const extractPlayCount = (root) => extractTextByLabel(root, [
         /プレイ回数/i,
         /プレイ数/i,
@@ -334,17 +349,32 @@
 
     const fetchRatingDetailSongSeeds = async (pageUrl, debug = null, label = '') => {
         const doc = await fetchDocument(pageUrl);
-        const songForms = doc.querySelectorAll('form[action$="sendMusicDetail/"]');
+        const songForms = Array.from(doc.querySelectorAll('form')).filter(form => {
+            const action = (form.getAttribute('action') || '').toLowerCase();
+            if (action.includes('sendmusicdetail') || action.includes('sendrankingdetail') || action.includes('sendranking')) return true;
+            return !!(form.querySelector('input[name="idx"]') || form.querySelector('input[name="diff"]'));
+        });
         const initialSongList = [];
 
         songForms.forEach(form => {
-            const title = form.querySelector('.music_title')?.innerText?.trim();
-            const seedStats = extractSeedDetailStats(form);
+            const box = form.closest('.music_box') || form.parentElement || form;
+            const title =
+                box.querySelector('.play_musicdata_title')?.innerText?.trim() ||
+                box.querySelector('.music_title')?.innerText?.trim() ||
+                box.querySelector('.musicdata_title')?.innerText?.trim() || '';
+            const seedStats = extractSeedDetailStats(box);
             const params = {};
             form.querySelectorAll('input[name]').forEach(input => {
                 params[input.name] = input.value || '';
             });
-            if (!title || !params.idx || !params.token || !params.genre || !params.diff) return;
+
+            if (!title || !params.idx || !params.token || !params.genre) return;
+
+            if (!params.diff) {
+                const diffText = box.querySelector('.musicdata_detail_difficulty')?.innerText?.trim() || '';
+                const classDiff = String(box.className || '').match(/bg_([a-z0-9_]+)/i)?.[1] || '';
+                params.diff = normalizeDiffRaw(diffText || classDiff) || '';
+            }
 
             initialSongList.push({
                 title,
@@ -354,6 +384,42 @@
                 score_int: seedStats.score_int,
                 playCount: seedStats.playCount || 'N/A',
             });
+        });
+
+        // .music_box に直接ぶら下がっている難易度ブロックも拾う
+        const existingKeys = new Set(initialSongList.map(song => `${song.title}|${song.params?.idx}|${song.params?.diff}`));
+        Array.from(doc.querySelectorAll('.music_box')).forEach(box => {
+            const form = box.querySelector('form');
+            if (!form) return;
+
+            const params = {};
+            form.querySelectorAll('input[name]').forEach(input => {
+                params[input.name] = input.value || '';
+            });
+            if (!params.idx || !params.token || !params.genre) return;
+
+            const title = box.querySelector('.play_musicdata_title')?.innerText?.trim() || '';
+            if (!title) return;
+
+            if (!params.diff) {
+                const diffText = box.querySelector('.musicdata_detail_difficulty')?.innerText?.trim() || '';
+                const classDiff = String(box.className || '').match(/bg_([a-z0-9_]+)/i)?.[1] || '';
+                params.diff = normalizeDiffRaw(diffText || classDiff) || '';
+            }
+
+            const key = `${title}|${params.idx}|${params.diff}`;
+            if (existingKeys.has(key)) return;
+
+            const seedStats = extractSeedDetailStats(box);
+            initialSongList.push({
+                title,
+                detailSendUrl: form.getAttribute('action') ? new URL(form.getAttribute('action'), window.location.origin).href : '',
+                params,
+                score_str: seedStats.score_str,
+                score_int: seedStats.score_int,
+                playCount: seedStats.playCount || 'N/A',
+            });
+            existingKeys.add(key);
         });
 
         if (debug) {
