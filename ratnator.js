@@ -347,7 +347,13 @@
             let songData = songDataMap.get(`${normalizedTitle}|${diffKey}`);
             if (!songData) {
                 const candidates = titleMap.get(normalizedTitle) || [];
-                songData = candidates.find(entry => entry.diff === diffKey) || candidates[0] || null;
+                // If the same title exists across multiple difficulties, do not collapse to the first one.
+                // That would make every diff look identical and later dedupe would delete most rows.
+                if (candidates.length === 1) {
+                    songData = candidates[0];
+                } else {
+                    songData = candidates.find(entry => entry.diff === diffKey) || null;
+                }
             }
             if (!songData) return null;
 
