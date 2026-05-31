@@ -61,6 +61,25 @@
         return new DOMParser().parseFromString(htmlText, 'text/html');
     };
 
+    const normalizeDiffRaw = (raw) => {
+        if (!raw) return null;
+        const s = String(raw).trim();
+        const num = s.match(/([0-4])/);
+        if (num) return String(num[1]);
+        const lower = s.toLowerCase();
+        if (/\b(basic|bas)\b/.test(lower)) return '0';
+        if (/\b(advanced|adv)\b/.test(lower)) return '1';
+        if (/\b(expert|exp)\b/.test(lower)) return '2';
+        if (/\b(master|mas)\b/.test(lower)) return '3';
+        if (/\b(ultima|ult|ultimate)\b/.test(lower)) return '4';
+        if (/ベーシック|ベーシク|べーしっく|ベシック/.test(s)) return '0';
+        if (/アドバンス|アドバン|アドバンスド|アドバ|あどばんす/.test(s)) return '1';
+        if (/エキスパート|エキスパ|エクスパート/.test(s)) return '2';
+        if (/マスター|マスタ/.test(s)) return '3';
+        if (/ウルティマ|アルティマ|ウルティメイト|アルティメット/.test(s)) return '4';
+        return null;
+    };
+
     /**
      * Parse a score-like string and return numeric value.
      * Prefers matches of 6+ digits to avoid picking up small numbers.
@@ -473,17 +492,38 @@
 
     const fetchRatingDetailSongSeeds = async (pageUrl, label = '') => {
         const doc = await fetchDocument(pageUrl);
-        const songForms = doc.querySelectorAll('form[action$="sendMusicDetail/"]');
+        const allForms = Array.from(doc.querySelectorAll('form'));
+        const songForms = allForms.filter(f => {
+            const action = (f.getAttribute('action') || '').toLowerCase();
+            if (action.includes('sendmusicdetail') || action.includes('sendrankingdetail') || action.includes('sendranking')) return true;
+            return !!(f.querySelector('input[name="idx"]') || f.querySelector('input[name="diff"]'));
+        });
+
         const initialSongList = [];
 
         songForms.forEach(form => {
-            const title = form.querySelector('.music_title')?.innerText?.trim();
-            const seedStats = extractSeedDetailStats(form);
+            const container = form.closest('.music_box') || form.previousElementSibling || form.parentElement || form;
+            let title = (form.querySelector('.music_title')?.innerText?.trim()) ||
+                (container && container.querySelector('.play_musicdata_title')?.innerText?.trim()) ||
+                (container && container.querySelector('.musicdata_title')?.innerText?.trim()) ||
+                (doc.querySelector('.play_musicdata_title')?.innerText?.trim()) || '';
+
+            const seedStats = extractSeedDetailStats(container || form);
             const params = {};
             form.querySelectorAll('input[name]').forEach(input => {
                 params[input.name] = input.value || '';
             });
-            if (!title || !params.idx || !params.token || !params.genre || !params.diff) return;
+
+            if (!title || !params.idx || !params.token) return;
+
+            // try to infer diff from container if missing
+            if (!params.diff) {
+                const diffElText = (container && (container.querySelector('.musicdata_detail_difficulty')?.innerText || container.querySelector('.title_advanced')?.innerText)) || '';
+                const classMatch = (container && String(container.className || '').match(/bg_([a-zA-Z0-9_]+)/));
+                let inferred = normalizeDiffRaw(diffElText || (classMatch ? classMatch[1] : ''));
+                if (!inferred && doc.querySelector('input[name="diff"]')?.value) inferred = normalizeDiffRaw(doc.querySelector('input[name="diff"]')?.value);
+                if (inferred) params.diff = inferred;
+            }
 
             initialSongList.push({
                 title,
@@ -494,6 +534,51 @@
                 playCount: seedStats.playCount || 'N/A',
             });
         });
+
+        // additional: scan .music_box blocks for seeds when forms are not present or diffs are per-box
+        try {
+            const existingIdxs = new Set(initialSongList.map(s => s.params?.idx));
+            const boxes = Array.from(doc.querySelectorAll('.music_box'));
+            const globalTitle = doc.querySelector('.play_musicdata_title')?.innerText?.trim() || '';
+            boxes.forEach(box => {
+                try {
+                    const form = box.querySelector('form') || box.querySelector('form[action]');
+                    const params = {};
+                    if (form) {
+                        form.querySelectorAll('input[name]').forEach(input => { params[input.name] = input.value || ''; });
+                    }
+                    if (!form) {
+                        const inputs = box.querySelectorAll('input[type=hidden][name]');
+                        inputs.forEach(input => { params[input.name] = input.value || ''; });
+                    }
+
+                    if (!params.idx || !params.token) return;
+                    if (existingIdxs.has(params.idx)) return;
+
+                    const title = globalTitle || box.querySelector('.play_musicdata_title')?.innerText?.trim() || box.querySelector('.musicdata_title')?.innerText?.trim() || '';
+                    if (!title) return;
+
+                    // infer diff from box: class or inner difficulty label
+                    if (!params.diff) {
+                        const diffText = box.querySelector('.musicdata_detail_difficulty')?.innerText?.trim() || '';
+                        const classMatch = String(box.className || '').match(/bg_([a-zA-Z0-9_]+)/);
+                        let inferred = normalizeDiffRaw(diffText || (classMatch ? classMatch[1] : ''));
+                        if (inferred) params.diff = inferred;
+                    }
+
+                    const seedStats = extractSeedDetailStats(box);
+                    initialSongList.push({
+                        title,
+                        detailSendUrl: (form && form.getAttribute('action')) ? new URL(form.getAttribute('action'), window.location.origin).href : '',
+                        params,
+                        score_str: seedStats.score_str,
+                        score_int: seedStats.score_int,
+                        playCount: seedStats.playCount || 'N/A',
+                    });
+                    existingIdxs.add(params.idx);
+                } catch (e) { /* ignore individual box errors */ }
+            });
+        } catch (e) { /* ignore box-scan errors */ }
 
         console.info('[Ratnator] seed', { label, count: initialSongList.length });
 
