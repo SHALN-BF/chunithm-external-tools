@@ -534,9 +534,32 @@
         return { detailedNewSongs, detailedOldSongs };
     };
 
+    const dedupeSongsByTitleAndDifficulty = (songs) => {
+        const byKey = new Map();
+        for (const song of songs || []) {
+            const key = `${normalizeTitle(song.title)}|${String(song.difficulty || '')}`;
+            const current = byKey.get(key);
+            if (!current) {
+                byKey.set(key, song);
+                continue;
+            }
+
+            const currentScore = Number(current.score_int) || 0;
+            const nextScore = Number(song.score_int) || 0;
+            const currentRating = Number(current.rating) || 0;
+            const nextRating = Number(song.rating) || 0;
+
+            if (nextScore > currentScore || (nextScore === currentScore && nextRating > currentRating)) {
+                byKey.set(key, song);
+            }
+        }
+
+        return Array.from(byKey.values());
+    };
+
     const buildFrameLists = (detailedOldSongs, detailedNewSongs) => ({
-        best: detailedOldSongs.slice(0, MAX_BEST_COUNT),
-        recent: detailedNewSongs.slice(0, MAX_NEW_COUNT),
+        best: dedupeSongsByTitleAndDifficulty(detailedOldSongs).slice(0, MAX_BEST_COUNT),
+        recent: dedupeSongsByTitleAndDifficulty(detailedNewSongs).slice(0, MAX_NEW_COUNT),
     });
 
     const createOverlay = () => {
