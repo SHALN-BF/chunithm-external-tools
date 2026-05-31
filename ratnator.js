@@ -211,29 +211,63 @@
             '.musicdata_score_num .text_b',
             '.rank_playdata_highscore .text_b'
         ];
-        const scoreElementText = getTextFromSelectors(root, scoreSelectors);
-        const scoreElementHtml = (root.querySelector(scoreSelectors[0])?.outerHTML) || '';
 
-        // fallback to label-based extraction if selector didn't yield a score-like string
-        const scoreTextCandidate = scoreElementText || extractTextByLabel(root, [/HIGH\s*SCORE/i, /SCORE/i, /スコア/i]);
-        const parsedScore = parseScoreFromText(scoreTextCandidate);
+        // Collect candidate elements that often contain score or play count
+        const candidateEls = Array.from(root.querySelectorAll('.musicdata_score_num .text_b, .play_musicdata_highscore .text_b, .block_underline .text_b'));
+        let scoreTextCandidate = '';
+        let playCountCandidate = '';
+        let rawScoreHtml = '';
 
-        // play count selector-first
+        for (const el of candidateEls) {
+            const txt = (el.innerText || el.textContent || '').trim();
+            if (!txt) continue;
+            // candidate for score: prefers 6+ digit numbers
+            const parsed = parseScoreFromText(txt);
+            if (parsed.scoreInt && parsed.scoreInt >= 100000) {
+                // treat as score
+                if (!scoreTextCandidate) {
+                    scoreTextCandidate = parsed.scoreStr;
+                    rawScoreHtml = el.outerHTML || rawScoreHtml;
+                    continue;
+                }
+            }
+            // candidate for play count: contains '回' or small integer
+            if (/回/.test(txt) || (/^\d{1,4}$/.test(txt.replace(/[^\d]/g, '')) && !scoreTextCandidate)) {
+                if (!playCountCandidate) playCountCandidate = txt;
+            }
+        }
+
+        // fallback: selector-based score
+        if (!scoreTextCandidate) {
+            scoreTextCandidate = getTextFromSelectors(root, scoreSelectors) || extractTextByLabel(root, [/HIGH\s*SCORE/i, /SCORE/i, /スコア/i]);
+            rawScoreHtml = rawScoreHtml || (root.querySelector(scoreSelectors[0])?.outerHTML) || '';
+        }
+
+        const parsedScore = parseScoreFromText(scoreTextCandidate || '');
+
+        // play count selectors (expanded)
         const playCountSelectors = [
             '.musiclist_box .playcount .text_b',
             '.musiclist_box .musicdata_playcount .text_b',
-            '.block_underline .musicdata_score_num .text_b',
+            '.block_underline .musicdata_playcount .text_b',
             '.musicdata_playcount .text_b',
-            '.play_count .text_b'
+            '.play_count .text_b',
+            '.musicdata_score_num .text_b',
+            '.box14 .block_underline .text_b'
         ];
-        const playCountTextCandidate = getTextFromSelectors(root, playCountSelectors) || extractTextByLabel(root, [/プレイ回数/i, /プレイ数/i, /PLAY\s*COUNT/i, /PLAYCOUNT/i]);
+
+        const playFromSelectors = getTextFromSelectors(root, playCountSelectors);
+        const playFromLabel = extractTextByLabel(root, [/プレイ回数/i, /プレイ数/i, /PLAY\s*COUNT/i, /PLAYCOUNT/i]);
+
+        // choose best playCount candidate: explicit '回' containing > selector fallback > label fallback
+        const finalPlay = playCountCandidate || playFromSelectors || playFromLabel || '';
 
         return {
             scoreStr: parsedScore.scoreStr,
             scoreInt: parsedScore.scoreInt,
             rawScoreText: scoreTextCandidate || '',
-            rawScoreHtml: scoreElementHtml || '',
-            playCount: playCountTextCandidate || '',
+            rawScoreHtml: rawScoreHtml || '',
+            playCount: finalPlay || '',
         };
     };
 
