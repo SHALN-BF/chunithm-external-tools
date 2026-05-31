@@ -397,7 +397,6 @@
                 box.querySelector('.play_musicdata_title')?.innerText?.trim() ||
                 box.querySelector('.music_title')?.innerText?.trim() ||
                 box.querySelector('.musicdata_title')?.innerText?.trim() || '';
-            const seedStats = extractSeedDetailStats(box, params.diff || null);
             const params = {};
             form.querySelectorAll('input[name]').forEach(input => {
                 params[input.name] = input.value || '';
@@ -410,6 +409,8 @@
                 const classDiff = String(box.className || '').match(/bg_([a-z0-9_]+)/i)?.[1] || '';
                 params.diff = normalizeDiffRaw(diffText || classDiff) || '';
             }
+
+            const seedStats = extractSeedDetailStats(box, params.diff || null);
 
             initialSongList.push({
                 title,
