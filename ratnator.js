@@ -158,18 +158,53 @@
         return '';
     };
 
-    const extractMusicDetailStats = (root) => {
-        const scoreElement = root.querySelector('.musicdata_score_num .text_b, .rank_playdata_highscore .text_b, .play_musicdata_highscore .text_b');
-        const scoreText = scoreElement?.innerText?.trim() || extractTextByLabel(root, [
+    const selectDetailBox = (root, targetDiff = null) => {
+        if (!root) return null;
+        if (root.classList?.contains('music_box')) return root;
+
+        const boxes = Array.from(root.querySelectorAll('.music_box'));
+        if (boxes.length === 0) return root;
+        if (boxes.length === 1 || targetDiff === null || targetDiff === undefined || targetDiff === '') return boxes[0];
+
+        const diffCode = String(targetDiff);
+        const diffNameMap = {
+            '0': 'BASIC',
+            '1': 'ADVANCED',
+            '2': 'EXPERT',
+            '3': 'MASTER',
+            '4': 'ULTIMA',
+        };
+        const diffName = diffNameMap[diffCode] || '';
+
+        return boxes.find(box => {
+            const hiddenDiff = box.querySelector('form input[name="diff"]')?.value || '';
+            if (String(hiddenDiff) === diffCode) return true;
+
+            const labelText = (box.querySelector('.musicdata_detail_difficulty')?.textContent || box.textContent || '').toUpperCase();
+            if (diffName && labelText.includes(diffName)) return true;
+
+            const className = String(box.className || '').toLowerCase();
+            return (diffCode === '0' && className.includes('basic'))
+                || (diffCode === '1' && className.includes('advanced'))
+                || (diffCode === '2' && className.includes('expert'))
+                || (diffCode === '3' && className.includes('master'))
+                || (diffCode === '4' && (className.includes('ultima') || className.includes('ultimate')));
+        }) || boxes[0];
+    };
+
+    const extractMusicDetailStats = (root, targetDiff = null) => {
+        const boxRoot = selectDetailBox(root, targetDiff) || root;
+        const scoreElement = boxRoot.querySelector('.musicdata_score_num .text_b, .rank_playdata_highscore .text_b, .play_musicdata_highscore .text_b');
+        const scoreText = scoreElement?.innerText?.trim() || extractTextByLabel(boxRoot, [
             /HIGH\s*SCORE/i,
             /SCORE/i,
             /スコア/i,
         ]);
         const parsedScore = parseScoreFromText(scoreText);
 
-        const playCountBlock = Array.from(root.querySelectorAll('.block_underline')).find(block => /プレイ回数/i.test(block.textContent || ''));
+        const playCountBlock = Array.from(boxRoot.querySelectorAll('.block_underline')).find(block => /プレイ回数/i.test(block.textContent || ''));
         const playCountElement = playCountBlock?.querySelector('.musicdata_score_num .text_b');
-        const playCountText = playCountElement?.innerText?.trim() || extractTextByLabel(root, [
+        const playCountText = playCountElement?.innerText?.trim() || extractTextByLabel(boxRoot, [
             /プレイ回数/i,
             /プレイ数/i,
             /PLAY\s*COUNT/i,
@@ -183,8 +218,8 @@
         };
     };
 
-    const extractSeedDetailStats = (root) => {
-        const detailStats = extractMusicDetailStats(root);
+    const extractSeedDetailStats = (root, targetDiff = null) => {
+        const detailStats = extractMusicDetailStats(root, targetDiff);
         return {
             score_str: detailStats.scoreStr,
             score_int: detailStats.scoreInt,
@@ -362,7 +397,7 @@
                 box.querySelector('.play_musicdata_title')?.innerText?.trim() ||
                 box.querySelector('.music_title')?.innerText?.trim() ||
                 box.querySelector('.musicdata_title')?.innerText?.trim() || '';
-            const seedStats = extractSeedDetailStats(box);
+            const seedStats = extractSeedDetailStats(box, params.diff || null);
             const params = {};
             form.querySelectorAll('input[name]').forEach(input => {
                 params[input.name] = input.value || '';
@@ -410,7 +445,7 @@
             const key = `${title}|${params.idx}|${params.diff}`;
             if (existingKeys.has(key)) return;
 
-            const seedStats = extractSeedDetailStats(box);
+            const seedStats = extractSeedDetailStats(box, params.diff || null);
             initialSongList.push({
                 title,
                 detailSendUrl: form.getAttribute('action') ? new URL(form.getAttribute('action'), window.location.origin).href : '',
@@ -456,7 +491,7 @@
                     redirect: 'follow',
                 });
 
-                const detailStats = extractMusicDetailStats(detailDoc);
+                const detailStats = extractMusicDetailStats(detailDoc, song.params?.diff || null);
                 const seedScoreInt = Number(song.score_int) || 0;
                 const scoreInt = Number(detailStats.scoreInt) > 0 ? Number(detailStats.scoreInt) : seedScoreInt;
                 const scoreStr = detailStats.scoreStr || song.score_str || '';
