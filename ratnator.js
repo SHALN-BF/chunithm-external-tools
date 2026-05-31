@@ -110,10 +110,12 @@
     };
 
     const getRankInfo = (score) => {
+        // thresholds adjusted per user specification
         if (score >= 1009000) return { rank: 'SSS+', color: '#FFD700' };
         if (score >= 1007500) return { rank: 'SSS', color: '#ffdf75' };
         if (score >= 1005000) return { rank: 'SS+', color: '#ffda8a' };
         if (score >= 1000000) return { rank: 'SS', color: '#fcc652' };
+        if (score >= 990000) return { rank: 'S+', color: '#ffbf5f' };
         if (score >= 975000) return { rank: 'S', color: '#ffaf47' };
         if (score >= 950000) return { rank: 'AAA', color: '#f44336' };
         if (score >= 925000) return { rank: 'AA', color: '#f44336' };
