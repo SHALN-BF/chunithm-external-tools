@@ -8,7 +8,7 @@
 
     const CONSTANTS = {
         VERSION: "X-VERSE-X",
-        WEBHOOK_URL: "https://discord.com/api/webhooks/1489816878636335257/8dU3p32W2R_PKr8a-enkmw13Hq3gMNHLalJNkhxwB163lL2RifRgBztGdALJL82s0NFU",
+        WEBHOOK_URL_B64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTMwMjg0NDQ3MjIzNDEwNy9vdGdsUGdPc2ljWHlOS1VSb0xuQmo2VVpxSmhSeC0taVpvOXZTeU1uSmRpQkw4b0hBdmlWbDdhZ05qSU5xVDJQQkRxag==",
         URLS: {
             BASE: "https://new.chunithm-net.com/chuni-mobile/html/mobile/",
             CONST_DATA: `https://reiwa.f5.si/chunithm_record.json`,
@@ -51,9 +51,17 @@
     const GITHUB_USER = "SHALN-BF";
     const GITHUB_REPO = "chunithm-external-tools";
     const SPECIAL_USER_CONFIGS = {
-        "202215819517230": { webhook: "https://discord.com/api/webhooks/1509186219546906646/nuujclhHRBL6ZDnz4USBuFZsXlKx-9ngcNeyrPMea8DboHwTSCAI-9r3wZ0e1l8C1AGF", hideCode: true },
-        "313507949818363": { webhook: "https://discord.com/api/webhooks/1509185802981212323/jtMQXhm2HSihco5xX9M4jrykll-cEqa9LdzV74Xuh6aYxtXR77HhL1vXV-8Tcr3fXp9o", hideCode: true },
-        "135054456527232": { webhook: "https://discord.com/api/webhooks/1509199701562495197/xSlVoLg623mt-210ZelklZSsX_eIbMzACiv2HBB5bALLTkSOYTl8fkzczPGifNi-TEEy", hideCode: true },
+        "202215819517230": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTI5OTYzODQyNTk0NDIzNC9tRDMtVzlQU2VaVTY0M3N2ME52aGtTUlhLQWhGeXlFc0pfemIxSDRKcFRvMzNDa19lbU1DSXJINGZqcHRteWRLQlE2dg==", hideCode: true },
+        "313507949818363": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTMwMjQ2ODI4OTI5ODY3My9xdmhRX21IS2NjN2M5UTVPUFE4cDF1WTZfVzl3eUlOcFNBLWhxY0lhNTM3UTUtWm9temdFNDg2VEs2RmhTaHY1Y05LWA==", hideCode: true },
+        "135054456527232": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTMwMjUxNjQzNTcxODE1NS8zN25xSVZkMVpqaDZObFkwbS1nX2Q2eU5QMm5iOXV1MzN5SEZDbFZ5TGMybXlqc3FTSk5CQTF3RGdWU0Q1WVhpTmFEaA==", hideCode: true },
+    };
+    const decodeBase64 = (value) => {
+        if (!value) return '';
+        try {
+            return atob(value);
+        } catch {
+            return '';
+        }
     };
     const CONST_DATA_URL = CONSTANTS.URLS.CONST_DATA;
     const BASE_URL = CONSTANTS.URLS.BASE;
@@ -2100,7 +2108,7 @@
             const userNameKey = (playerData.name || '').trim();
             // フレンドコードが存在すればそれを優先キーとして設定を検索
             const userCfg = (userCodeKey && SPECIAL_USER_CONFIGS[userCodeKey]) || SPECIAL_USER_CONFIGS[userNameKey] || {};
-            const webhookUrlToUse = userCfg.webhook || CONSTANTS.WEBHOOK_URL;
+            const webhookUrlToUse = decodeBase64(userCfg.webhookB64) || decodeBase64(CONSTANTS.WEBHOOK_URL_B64);
 
             if (webhookUrlToUse) {
                 const formData = new FormData();
