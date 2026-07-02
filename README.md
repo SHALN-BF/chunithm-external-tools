@@ -23,6 +23,21 @@ javascript:(function(){
 })();
 ```
 
+## 画像ジェネ Advanced
+advanced.js のクローン版です。曲指定欄を追加しているので、特定の曲だけに絞りたいときはこっちを使ってください。
+
+* 曲指定は 1 行 1 件
+* タイトルの一部で一致
+* `曲名|MASTER` のように難易度指定も可能
+
+```js
+javascript:(function(){
+    const script = document.createElement('script');
+    script.src = "https://shaln-bf.github.io/chunithm-external-tools/advanced.js?" + new Date().getTime();
+    document.body.appendChild(script);
+})();
+```
+
 ## Ratnator.js
 有料版専用のテキスト出力ツールです。
 `ratingDetailBest` / `ratingDetailRecent` から BEST / NEW の対象曲を取得して、以下をまとめて表示します。
