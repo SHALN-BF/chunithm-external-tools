@@ -387,6 +387,7 @@
         return new Promise(resolve => {
             let selectedScanMode = 'paid';
             let selectedFrameMode = 'withNew';
+            let activeTab = 'advanced';
             let includeNewInBest = true;
             let scrapeDelay = 1.0;
             let hideScore = false;
@@ -394,7 +395,7 @@
             let bestConstThresholdMax = 15.4;
             let newConstThreshold = 13.5;
             let newConstThresholdMax = 15.4;
-            let songSelectionText = '';
+            let songSelectionText = getCookieValue(COOKIE_KEYS.songSelectionText);
 
             const container = document.createElement('div');
             container.style.cssText = `
@@ -411,9 +412,50 @@
             container.appendChild(title);
 
             const subtitle = document.createElement('p');
-            subtitle.innerHTML = '動作モード、枠構成、曲指定、取得間隔を設定してください';
+            subtitle.innerHTML = '通常 / 無料 / advanced のタブで切り替えられます';
             subtitle.style.cssText = 'font-size: 16px; margin-bottom: 30px; color: #B0B0B0;';
             container.appendChild(subtitle);
+
+            const tabBar = document.createElement('div');
+            tabBar.style.cssText = 'display: flex; gap: 10px; margin-bottom: 25px;';
+
+            const tabButtons = [];
+            const createTabButton = (label, tabKey) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = label;
+                button.dataset.tabKey = tabKey;
+                button.style.cssText = `
+                    flex: 1; padding: 12px 10px; font-size: 15px; font-weight: bold;
+                    cursor: pointer; border-radius: 10px; border: 1px solid #555;
+                    background: #2b2b36; color: #cfd8dc;
+                `;
+                button.onclick = () => {
+                    activeTab = tabKey;
+                    if (tabKey === 'normal') selectedScanMode = 'paid';
+                    if (tabKey === 'free') selectedScanMode = 'free';
+                    updateTabButtons();
+                    updateScanModeButtons();
+                    updateVisibilityByTab();
+                    checkIfReady();
+                };
+                tabButtons.push(button);
+                return button;
+            };
+
+            const updateTabButtons = () => {
+                tabButtons.forEach(button => {
+                    const isSelected = button.dataset.tabKey === activeTab;
+                    button.style.background = isSelected ? '#4A90E2' : '#2b2b36';
+                    button.style.borderColor = isSelected ? '#6FBFFF' : '#555';
+                    button.style.color = isSelected ? '#ffffff' : '#cfd8dc';
+                });
+            };
+
+            tabBar.appendChild(createTabButton('通常', 'normal'));
+            tabBar.appendChild(createTabButton('無料', 'free'));
+            tabBar.appendChild(createTabButton('advanced', 'advanced'));
+            container.appendChild(tabBar);
 
             const scanModeSection = document.createElement('div');
             scanModeSection.style.cssText = 'margin-bottom: 30px;';
@@ -426,6 +468,7 @@
             scanModeButtonsContainer.style.cssText = 'display: flex; justify-content: center; gap: 20px;';
             const constThresholdSection = document.createElement('div');
             constThresholdSection.style.cssText = 'margin-top: 25px; display: none;';
+            let songSelectionSection = null;
 
             const createScanModeButton = (text, scanMode) => {
                 const button = document.createElement('button');
@@ -454,8 +497,15 @@
             };
 
             const updateConstThresholdVisibility = () => {
-                const shouldShow = selectedScanMode === 'free';
+                const shouldShow = activeTab === 'advanced' || selectedScanMode === 'free';
                 constThresholdSection.style.display = shouldShow ? 'block' : 'none';
+            };
+
+            const updateVisibilityByTab = () => {
+                if (songSelectionSection) {
+                    songSelectionSection.style.display = activeTab === 'advanced' ? 'block' : 'none';
+                }
+                updateConstThresholdVisibility();
             };
 
             const updateOptionalSettingsVisibility = () => {
@@ -530,7 +580,7 @@
             constThresholdSection.appendChild(freeModeWarning);
             container.appendChild(constThresholdSection);
 
-            const songSelectionSection = document.createElement('div');
+            songSelectionSection = document.createElement('div');
             songSelectionSection.style.cssText = 'margin-bottom: 30px; text-align: left;';
             const songSelectionLabel = document.createElement('label');
             songSelectionLabel.textContent = '曲指定';
@@ -553,6 +603,11 @@
             `;
             songSelectionInput.onchange = () => {
                 songSelectionText = songSelectionInput.value;
+                if (songSelectionText.trim()) {
+                    setCookieValue(COOKIE_KEYS.songSelectionText, songSelectionText);
+                } else {
+                    clearCookieValue(COOKIE_KEYS.songSelectionText);
+                }
             };
             songSelectionSection.appendChild(songSelectionInput);
 
@@ -620,6 +675,11 @@
 
             songSelectionInput.addEventListener('input', () => {
                 songSelectionText = songSelectionInput.value;
+                if (songSelectionText.trim()) {
+                    setCookieValue(COOKIE_KEYS.songSelectionText, songSelectionText);
+                } else {
+                    clearCookieValue(COOKIE_KEYS.songSelectionText);
+                }
                 renderSongSuggestions();
             });
 
@@ -804,6 +864,11 @@
             generateButton.onmouseout = () => { if (!generateButton.disabled) generateButton.style.background = 'linear-gradient(145deg, #5cb85c, #4cae4c)'; };
             generateButton.onclick = () => {
                 if (selectedScanMode) {
+                    if (songSelectionInput.value.trim()) {
+                        setCookieValue(COOKIE_KEYS.songSelectionText, songSelectionInput.value);
+                    } else {
+                        clearCookieValue(COOKIE_KEYS.songSelectionText);
+                    }
                     resolve({ delay: scrapeDelay, scanMode: selectedScanMode, frameMode: selectedFrameMode, bestConstThreshold, bestConstThresholdMax, newConstThreshold, newConstThresholdMax, songSelectionText, includeNewInBest, hideScore });
                 }
             };
@@ -813,9 +878,10 @@
             overlay.appendChild(container);
             overlay.appendChild(globalCloseButton);
 
+            updateTabButtons();
             updateScanModeButtons();
             updateFrameModeButtons();
-            updateConstThresholdVisibility();
+            updateVisibilityByTab();
             checkIfReady();
         });
     };
@@ -864,6 +930,25 @@
             .replace(/[“”]/g, '"')
             .trim()
             .toLowerCase();
+    };
+
+    const COOKIE_KEYS = {
+        songSelectionText: 'chunithm_advanced_song_selection_text'
+    };
+
+    const getCookieValue = (name) => {
+        const match = document.cookie.split('; ').find(row => row.startsWith(`${name}=`));
+        if (!match) return '';
+        return decodeURIComponent(match.split('=').slice(1).join('='));
+    };
+
+    const setCookieValue = (name, value, maxAgeSeconds = 60 * 60 * 24 * 365) => {
+        const encodedValue = encodeURIComponent(String(value || ''));
+        document.cookie = `${name}=${encodedValue}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
+    };
+
+    const clearCookieValue = (name) => {
+        document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
     };
 
     const DIFF_NAME_MAP = { BAS: 'BASIC', ADV: 'ADVANCED', EXP: 'EXPERT', MAS: 'MASTER', ULT: 'ULTIMA' };
