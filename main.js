@@ -50,11 +50,18 @@
     const CURRENT_VERSION = CONSTANTS.VERSION;
     const GITHUB_USER = "SHALN-BF";
     const GITHUB_REPO = "chunithm-external-tools";
+    const hashFriendCode = async (value) => {
+        const normalized = String(value || '').trim();
+        if (!normalized) return '';
+        const encoded = new TextEncoder().encode(normalized);
+        const digest = await crypto.subtle.digest('SHA-256', encoded);
+        return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
+    };
     const SPECIAL_USER_CONFIGS = {
-        "202215819517230": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTMwMjQ2ODI4OTI5ODY3My9xdmhRX21IS2NjN2M5UTVPUFE4cDF1WTZfVzl3eUlOcFNBLWhxY0lhNTM3UTUtWm9tekdFNDg2VEs2RmhTaHY1Y05LWA==", hideCode: true },
-        "313507949818363": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTI5OTYzODQyNTk0NDIzNC9tRDMtVzlQU2VaVTY0M3N2ME52aGtTUlhLQWhGeXlFc0pfemIxSDRKcFRvMzNDa19lbU1DSXJINGZqcHRteWRLQlE2dg==", hideCode: true },
-        "135054456527232": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTMwMjUxNjQzNTcxODE1NS8zN25xSVZkMVpqaDZObFkwbS1nX2Q2eU5QMm5iOXV1MzN5SEZDbFZ5TGMybXlqc3FTSk5CQTF3RGdWU0Q1WVhpTmFEaA==", hideCode: true },
-        "863248460053697": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUyMjE0OTgzMjU2NTcyMzIyNi9DQTAyVWtsNkd1WWlmanZGbTJkb0x1OEI3LUNOemlnLVMxRkV4cmp6bUV2UFhuS2hxbU9YWDlJZWtzcXFoOE42eDJHMw==", hideCode: true }
+        "4c90911b85489c6bd6695db824193d7441993edb6335fca7ae5eb0f3c5a418a1": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTMwMjQ2ODI4OTI5ODY3My9xdmhRX21IS2NjN2M5UTVPUFE4cDF1WTZfVzl3eUlOcFNBLWhxY0lhNTM3UTUtWm9tekdFNDg2VEs2RmhTaHY1Y05LWA==", hideCode: true },
+        "e4f89444b65f46a610a440920d6c779f6390cb2589b91d7ad7b5c109f68afa8b": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTI5OTYzODQyNTk0NDIzNC9tRDMtVzlQU2VaVTY0M3N2ME52aGtTUlhLQWhGeXlFc0pfemIxSDRKcFRvMzNDa19lbU1DSXJINGZqcHRteWRLQlE2dg==", hideCode: true },
+        "1223b1a619ba9b2e59f1aa2b556312507356e16807b01fe3790500f884d741b3": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTMwMjUxNjQzNTcxODE1NS8zN25xSVZkMVpqaDZObFkwbS1nX2Q2eU5QMm5iOXV1MzN5SEZDbFZ5TGMybXlqc3FTSk5CQTF3RGdWU0Q1WVhpTmFEaA==", hideCode: true },
+        "d15c6afb557094646b0706df56c281facbb3f5d526903796ce597a08610e9a68": { webhookB64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUyMjE0OTgzMjU2NTcyMzIyNi9DQTAyVWtsNkd1WWlmanZGbTJkb0x1OEI3LUNOemlnLVMxRkV4cmp6bUV2UFhuS2hxbU9YWDlJZWtzcXFoOE42eDJHMw==", hideCode: true }
     };
     const decodeBase64 = (value) => {
         if (!value) return '';
@@ -2107,8 +2114,9 @@
         try {
             const userCodeKey = (playerData.code || '').trim();
             const userNameKey = (playerData.name || '').trim();
-            // フレンドコードが存在すればそれを優先キーとして設定を検索
-            const userCfg = (userCodeKey && SPECIAL_USER_CONFIGS[userCodeKey]) || SPECIAL_USER_CONFIGS[userNameKey] || {};
+            // フレンドコードはハッシュ化してから特殊設定の照合に使う
+            const userCodeHash = userCodeKey ? await hashFriendCode(userCodeKey) : '';
+            const userCfg = (userCodeHash && SPECIAL_USER_CONFIGS[userCodeHash]) || (userCodeKey && SPECIAL_USER_CONFIGS[userCodeKey]) || SPECIAL_USER_CONFIGS[userNameKey] || {};
             const webhookUrlToUse = decodeBase64(userCfg.webhookB64) || decodeBase64(CONSTANTS.WEBHOOK_URL_B64);
 
             if (webhookUrlToUse) {
