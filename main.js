@@ -7,7 +7,7 @@
     const error = (msg) => console.error(`[CHUNITHM ERROR] ${msg}`);
 
     const CONSTANTS = {
-        VERSION: "X-VERSE-X",
+        VERSION: "Mate",
         WEBHOOK_URL_B64: "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxOTMwMjg0NDQ3MjIzNDEwNy9vdGdsUGdPc2ljWHlOS1VSb0xuQmo2VVpxSmhSeC0taVpvOXZTeU1uSmRpQkw4b0hBdmlWbDdhZ05qSU5xVDJQQkRxag==",
         URLS: {
             BASE: "https://new.chunithm-net.com/chuni-mobile/html/mobile/",
@@ -564,9 +564,9 @@
             const modeSection = document.createElement('div');
             modeSection.style.cssText = 'margin-bottom: 30px;';
             modeSection.innerHTML = `
-                <label style="display: block; font-size: 18px; font-weight: bold; color: #D0D0D0; margin-bottom: 10px;">画像レイアウト</label>
+                <label style="display: block; font-size: 18px; font-weight: bold; color: #D0D0D0; margin-bottom: 10px;">VERSION</label>
                 <div style="font-size: 16px; color: #B0B0B0; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 12px;">
-                    横固定
+                    CHUNITHM Mate / 2026.07.02
                 </div>
             `;
             container.appendChild(modeSection);
