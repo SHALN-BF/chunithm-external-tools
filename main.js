@@ -177,7 +177,9 @@
         const {
             matchMode = 'exact', // 'exact' (Title+Diff) or 'title' (Title only)
             bestConstThreshold = 14.5,
+            bestConstThresholdMax = 15.4,
             newConstThreshold = 13.5,
+            newConstThresholdMax = 15.4,
             applyConstThreshold = true,
             currentVersionName = '',
         } = options;
@@ -215,8 +217,12 @@
             const isNewSong = songData.version === currentVersionName;
 
             if (applyConstThreshold) {
-                const threshold = isNewSong ? newConstThreshold : bestConstThreshold;
-                if (Number(songData.const) < threshold) continue;
+                const thresholdMin = isNewSong ? newConstThreshold : bestConstThreshold;
+                const thresholdMax = isNewSong ? newConstThresholdMax : bestConstThresholdMax;
+                const lowerBound = Math.min(thresholdMin, thresholdMax);
+                const upperBound = Math.max(thresholdMin, thresholdMax);
+                const constValue = Number(songData.const);
+                if (constValue < lowerBound || constValue > upperBound) continue;
             }
 
             let initialSong = null;
@@ -383,7 +389,9 @@
             let scrapeDelay = 1.0;
             let hideScore = false;
             let bestConstThreshold = 14.5;
+            let bestConstThresholdMax = 15.4;
             let newConstThreshold = 13.5;
+            let newConstThresholdMax = 15.4;
 
             const container = document.createElement('div');
             container.style.cssText = `
@@ -459,9 +467,9 @@
             container.appendChild(scanModeSection);
 
             const constInputsContainer = document.createElement('div');
-            constInputsContainer.style.cssText = 'display: flex; justify-content: center; gap: 30px; align-items: center;';
+            constInputsContainer.style.cssText = 'display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; align-items: start;';
 
-            const createConstInput = (labelText, value, callback) => {
+            const createConstInput = (labelText, value, minValue, maxValue, callback) => {
                 const wrapper = document.createElement('div');
                 const label = document.createElement('label');
                 label.textContent = labelText;
@@ -471,8 +479,8 @@
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.value = value;
-                input.min = '3.0';
-                input.max = '15.4';
+                input.min = String(minValue);
+                input.max = String(maxValue);
                 input.step = '0.1';
                 input.style.cssText = `
                     width: 100px; padding: 8px; font-size: 18px; text-align: center;
@@ -480,7 +488,7 @@
                 `;
                 input.onchange = () => {
                     const val = parseFloat(input.value);
-                    if (!isNaN(val) && val >= 3.0 && val <= 15.4) {
+                    if (!isNaN(val) && val >= minValue && val <= maxValue) {
                         callback(val);
                     } else {
                         input.value = callback(null);
@@ -490,17 +498,27 @@
                 return wrapper;
             };
 
-            const bestInputWrapper = createConstInput('BEST枠 最小定数', bestConstThreshold, (val) => {
+            const bestInputWrapper = createConstInput('BEST枠 最小定数', bestConstThreshold, 3.0, 15.4, (val) => {
                 if (val !== null) bestConstThreshold = val;
                 return bestConstThreshold;
             });
-            const newInputWrapper = createConstInput('新曲枠 最小定数', newConstThreshold, (val) => {
+            const bestMaxInputWrapper = createConstInput('BEST枠 最大定数', bestConstThresholdMax, 3.0, 15.4, (val) => {
+                if (val !== null) bestConstThresholdMax = val;
+                return bestConstThresholdMax;
+            });
+            const newInputWrapper = createConstInput('新曲枠 最小定数', newConstThreshold, 3.0, 15.4, (val) => {
                 if (val !== null) newConstThreshold = val;
                 return newConstThreshold;
             });
+            const newMaxInputWrapper = createConstInput('新曲枠 最大定数', newConstThresholdMax, 3.0, 15.4, (val) => {
+                if (val !== null) newConstThresholdMax = val;
+                return newConstThresholdMax;
+            });
 
             constInputsContainer.appendChild(bestInputWrapper);
+            constInputsContainer.appendChild(bestMaxInputWrapper);
             constInputsContainer.appendChild(newInputWrapper);
+            constInputsContainer.appendChild(newMaxInputWrapper);
             constThresholdSection.appendChild(constInputsContainer);
 
             const freeModeWarning = document.createElement('p');
@@ -674,7 +692,7 @@
             generateButton.onmouseout = () => { if (!generateButton.disabled) generateButton.style.background = 'linear-gradient(145deg, #5cb85c, #4cae4c)'; };
             generateButton.onclick = () => {
                 if (selectedScanMode) {
-                    resolve({ delay: scrapeDelay, scanMode: selectedScanMode, frameMode: selectedFrameMode, bestConstThreshold, newConstThreshold, includeNewInBest, hideScore });
+                    resolve({ delay: scrapeDelay, scanMode: selectedScanMode, frameMode: selectedFrameMode, bestConstThreshold, bestConstThresholdMax, newConstThreshold, newConstThresholdMax, includeNewInBest, hideScore });
                 }
             };
             container.appendChild(generateButton);
@@ -1060,7 +1078,9 @@
         const {
             applyConstThreshold = false,
             bestConstThreshold = 3.0,
+            bestConstThresholdMax = 15.4,
             newConstThreshold = 3.0,
+            newConstThresholdMax = 15.4,
         } = options;
 
         updateMessage('有料モード: レコード経由で曲データを取得中...', 12);
@@ -1084,7 +1104,9 @@
         const { filteredNewSongs, filteredOldSongs } = filterAndEnrichSongsWithConstData(constData, initialSongList, {
             matchMode: 'exact',
             bestConstThreshold,
+            bestConstThresholdMax,
             newConstThreshold,
+            newConstThresholdMax,
             applyConstThreshold,
             currentVersionName
         });
@@ -1142,7 +1164,11 @@
     };
 
     const fetchAllSongsForFreeUser = async (bestConstThreshold, newConstThreshold, delay, constData, options = {}) => {
-        const { fetchNewSongs = true } = options;
+        const {
+            fetchNewSongs = true,
+            bestConstThresholdMax = 15.4,
+            newConstThresholdMax = 15.4
+        } = options;
 
         updateMessage('ランキングページにアクセス中...', 5);
         const initialSongList = await fetchRankingSongSeeds();
@@ -1155,7 +1181,9 @@
         const { filteredNewSongs: rawNewSongs, filteredOldSongs: rawOldSongs } = filterAndEnrichSongsWithConstData(constData, initialSongList, {
             matchMode: 'title',
             bestConstThreshold,
+            bestConstThresholdMax,
             newConstThreshold,
+            newConstThresholdMax,
             applyConstThreshold: true,
             currentVersionName
         });
@@ -1997,7 +2025,7 @@
 
     // --- メイン処理 ---
     try {
-        const { delay, scanMode, frameMode, bestConstThreshold, newConstThreshold, includeNewInBest, hideScore } = await askForSettings();
+        const { delay, scanMode, frameMode, bestConstThreshold, bestConstThresholdMax, newConstThreshold, newConstThresholdMax, includeNewInBest, hideScore } = await askForSettings();
 
         HIDE_SCORE = Boolean(hideScore);
         window.__hideScore = HIDE_SCORE;
@@ -2075,12 +2103,16 @@
         if (scanMode === 'free' || scanMode === 'paid') {
             const result = (scanMode === 'free')
                 ? await fetchAllSongsForFreeUser(bestConstThreshold, newConstThreshold, delay, constData, {
-                    fetchNewSongs: (frameMode === 'withNew') || includeNewInBest
+                    fetchNewSongs: (frameMode === 'withNew') || includeNewInBest,
+                    bestConstThresholdMax,
+                    newConstThresholdMax
                 })
                 : await fetchAllSongsForPaidUserViaRecord(delay, constData, {
                     applyConstThreshold: false,
                     bestConstThreshold,
+                    bestConstThresholdMax,
                     newConstThreshold,
+                    newConstThresholdMax,
                 });
             if (isAborted || !result) return;
 

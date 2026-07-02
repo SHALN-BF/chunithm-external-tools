@@ -61,7 +61,9 @@ class BrowserHandler {
             hideScore = false,
             scanMode = null,
             bestConstThreshold = null,
+            bestConstThresholdMax = null,
             newConstThreshold = null,
+            newConstThresholdMax = null,
             bestOnly = false
         } = options;
         if (!this.browser) await this.launchBrowser();
@@ -310,7 +312,9 @@ class BrowserHandler {
                         scanMode: settings.scanMode,
                         frameMode: settings.frameMode,
                         bestConstThreshold: settings.bestConstThreshold,
+                        bestConstThresholdMax: settings.bestConstThresholdMax,
                         newConstThreshold: settings.newConstThreshold,
+                        newConstThresholdMax: settings.newConstThresholdMax,
                         includeNewInBest: settings.includeNewInBest,
                         hideScore: settings.hideScore
                     };
@@ -327,7 +331,9 @@ class BrowserHandler {
                 scanMode: effectiveScanMode,
                 frameMode: bestOnly ? 'bestOnly' : 'withNew',
                 bestConstThreshold: Number.isFinite(bestConstThreshold) ? bestConstThreshold : 14.5,
+                bestConstThresholdMax: Number.isFinite(bestConstThresholdMax) ? bestConstThresholdMax : 15.4,
                 newConstThreshold: Number.isFinite(newConstThreshold) ? newConstThreshold : 13.5,
+                newConstThresholdMax: Number.isFinite(newConstThresholdMax) ? newConstThresholdMax : 15.4,
                 includeNewInBest: !bestOnly
             });
 

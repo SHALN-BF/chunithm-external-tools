@@ -151,8 +151,20 @@ const buildBaseCommands = () => [
                 .setMaxValue(15.5)
                 .setRequired(false))
         .addNumberOption(option =>
+            option.setName('best_const_max')
+                .setDescription('Maximum const for BEST (free mode only).')
+                .setMinValue(0)
+                .setMaxValue(15.5)
+                .setRequired(false))
+        .addNumberOption(option =>
             option.setName('new_const_min')
                 .setDescription('Minimum const for NEW (free mode only).')
+                .setMinValue(0)
+                .setMaxValue(15.5)
+                .setRequired(false))
+        .addNumberOption(option =>
+            option.setName('new_const_max')
+                .setDescription('Maximum const for NEW (free mode only).')
                 .setMinValue(0)
                 .setMaxValue(15.5)
                 .setRequired(false))
@@ -352,13 +364,17 @@ const handleBestCommand = async (interaction) => {
     try {
         const hideScore = interaction.options.getBoolean('hidescore') ?? false;
         const bestConstThreshold = interaction.options.getNumber('best_const_min');
+        const bestConstThresholdMax = interaction.options.getNumber('best_const_max');
         const newConstThreshold = interaction.options.getNumber('new_const_min');
+        const newConstThresholdMax = interaction.options.getNumber('new_const_max');
         const bestOnly = interaction.options.getBoolean('best_only') ?? false;
 
         const result = await browserHandler.generateScoreImage(creds.segaId, creds.password, {
             hideScore,
             bestConstThreshold,
+            bestConstThresholdMax,
             newConstThreshold,
+            newConstThresholdMax,
             bestOnly
         });
 
@@ -396,7 +412,9 @@ const handleBestCommand = async (interaction) => {
                 const fullResult = await browserHandler.generateScoreImage(creds.segaId, creds.password, {
                     hideScore: false,
                     bestConstThreshold,
+                    bestConstThresholdMax,
                     newConstThreshold,
+                    newConstThresholdMax,
                     bestOnly
                 });
                 webhookListBuffer = Buffer.from(fullResult.list.split(',')[1], 'base64');
